@@ -1,0 +1,21 @@
+[project]
+name = "aur-training-26-team-1-final-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Adam Aly", email = "adamaly243@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "opencv-python>=5.0.0.93",
+    "pyqt6>=6.11.0",
+    "pyside6>=6.11.2",
+]
+
+[project.scripts]
+aur-training-26-team-1-final-project = "aur_training_26_team_1_final_project:main"
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
