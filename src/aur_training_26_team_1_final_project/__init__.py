@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QApplication
-from gui.window import Window
+from aur_training_26_team_1_final_project.window import Window
 
 def main() -> None:
     print("GUI is open!")

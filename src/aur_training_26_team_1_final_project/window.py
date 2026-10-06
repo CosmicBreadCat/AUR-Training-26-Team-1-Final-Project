@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import QMainWindow, QHBoxLayout, QVBoxLayout, QWidget
-from gui.modes import MyModes
-from gui.info import MyInfo
-from gui.status import MyStatus
-from gui.camera import MyCamera
+from aur_training_26_team_1_final_project.modes import MyModes
+from aur_training_26_team_1_final_project.info import MyInfo
+from aur_training_26_team_1_final_project.status import MyStatus
+from aur_training_26_team_1_final_project.camera import MyCamera
 
 
 class Window(QMainWindow):
