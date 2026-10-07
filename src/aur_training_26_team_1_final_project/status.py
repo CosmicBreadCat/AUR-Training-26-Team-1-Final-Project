@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtGui import QColor, QPalette, Qt
+from PySide6.QtCore import Signal, QTimer
 import cv2
 import numpy as np
 
@@ -59,14 +60,8 @@ class MyStatus(QWidget):
 
         for i in range(3):
             self._color_widgets.append(QWidget())
-
-            self._color_widgets[i].setAutoFillBackground(True)
-            palette = self._color_widgets[i].palette()
-            palette.setColor(QPalette.ColorRole.Window, QColor(self.hsv_to_hex(self._colors[i])))
-            self._color_widgets[i].setPalette(palette)
-
+            self._color_widgets[i].setStyleSheet(self._get_gradient_style_sheet(self._colors[i*2], self._colors[i*2+1]))
             self._color_widgets_layout.addWidget(self._color_widgets[i])
-
 
         self._horizontal_layout = QHBoxLayout()
         self._horizontal_layout.addWidget(self._boxes_picked_label)
@@ -84,7 +79,7 @@ class MyStatus(QWidget):
         self._horizontal_layout_2.addLayout(self._status_msgs_layout)
         self._horizontal_layout_2.addLayout(self._color_widgets_layout)
 
-        self._horizontal_layout_2.setStretch(0, 2)
+        self._horizontal_layout_2.setStretch(0, 3)
         self._horizontal_layout_2.setStretch(1, 1)
 
         self._container = QVBoxLayout(self)
@@ -96,9 +91,22 @@ class MyStatus(QWidget):
         self._container.setStretch(1, 2)
         self._container.setStretch(2, 1)
 
-    def hsv_to_hex(self, hsv:tuple):
+    def _hsv_to_hex(self, hsv:tuple):
         # HSV_MAX = (179, 255, 255), OpenCV is used
         hsv_color = np.uint8([[[hsv[0], hsv[1], hsv[2]]]])
         rgb_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2RGB)
 
         return '#{:02x}{:02x}{:02x}'.format(rgb_color[0][0][0], rgb_color[0][0][1], rgb_color[0][0][2])
+
+    def _get_gradient_style_sheet(self, hsv1:tuple, hsv2:tuple):
+
+        hex1 = self._hsv_to_hex(hsv1)
+        hex2 = self._hsv_to_hex(hsv2)
+
+        return f"""background: qlineargradient(
+                        x1: 0, y1: 0, 
+                        x2: 1, y2: 0,
+                        stop: 0 {hex1}, 
+                        stop: 1 {hex2}
+                    );
+            """
