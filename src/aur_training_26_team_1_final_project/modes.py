@@ -1,19 +1,28 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit
 from PySide6.QtGui import QColor, QPalette, QIntValidator
 from PySide6.QtCore import Qt, Signal
+from functools import partial
 
 class MyModes(QWidget):
+    colors_updated = Signal(list)
+    autonomous_updated = Signal(int)
+    boxes_picked = Signal(int)
 
     def __init__(self):
 
         super().__init__()
         print('Modes Section has successfully appeared')
-            
+
+        #Background Color
         self.setAutoFillBackground(True)
         palette = self.palette()
         palette.setColor(QPalette.ColorRole.Window, QColor("#3e3e3e"))
         self.setPalette(palette)
 
+        #Validator for LineEdits of HSV
+        validator = QIntValidator(0, 255)
+
+        #Easy Boxes Settings
         self._easy = QVBoxLayout()
         self._easy_1 = QHBoxLayout()
         self._easy_2 = QHBoxLayout()
@@ -22,8 +31,11 @@ class MyModes(QWidget):
         self._easy_text.setText('Easy Boxes')
         self._easy_btn = QPushButton()
         self._easy_btn.setText('Change Mode')
-        self._easy_lower_hsv = QLineEdit()
-        self._easy_upper_hsv = QLineEdit()
+
+        self._easy_lower_hsv = QLineEdit(placeholderText='Lower HSV')
+        self._easy_upper_hsv = QLineEdit(placeholderText='Upper HSV')
+        self._easy_lower_hsv.setValidator(validator)
+        self._easy_upper_hsv.setValidator(validator)
 
         self._easy_1.addWidget(self._easy_text)
         self._easy_1.addWidget(self._easy_btn)
@@ -32,6 +44,7 @@ class MyModes(QWidget):
         self._easy.addLayout(self._easy_1)
         self._easy.addLayout(self._easy_2)
 
+        #Hard Boxes Settings
         self._hard = QVBoxLayout()
         self._hard_1 = QHBoxLayout()
         self._hard_2 = QHBoxLayout()
@@ -40,8 +53,11 @@ class MyModes(QWidget):
         self._hard_text.setText('Hard Boxes')
         self._hard_btn = QPushButton()
         self._hard_btn.setText('Change Mode')
-        self._hard_lower_hsv = QLineEdit()
-        self._hard_upper_hsv = QLineEdit()
+
+        self._hard_lower_hsv = QLineEdit(placeholderText='Lower HSV')
+        self._hard_upper_hsv = QLineEdit(placeholderText='Upper HSV')
+        self._hard_lower_hsv.setValidator(validator)
+        self._hard_upper_hsv.setValidator(validator)
 
         self._hard_1.addWidget(self._hard_text)
         self._hard_1.addWidget(self._hard_btn)
@@ -49,7 +65,8 @@ class MyModes(QWidget):
         self._hard_2.addWidget(self._hard_upper_hsv)
         self._hard.addLayout(self._hard_1)
         self._hard.addLayout(self._hard_2)
-    
+
+        #QR Boxes Settings    
         self._qr = QVBoxLayout()
         self._qr_1 = QHBoxLayout()
         self._qr_2 = QHBoxLayout()
@@ -58,8 +75,11 @@ class MyModes(QWidget):
         self._qr_text.setText('QR Boxes')
         self._qr_btn = QPushButton()
         self._qr_btn.setText('Change Mode')
-        self._qr_lower_hsv = QLineEdit()
-        self._qr_upper_hsv = QLineEdit()
+
+        self._qr_lower_hsv = QLineEdit(placeholderText='Lower HSV')
+        self._qr_upper_hsv = QLineEdit(placeholderText='Upper HSV')
+        self._qr_lower_hsv.setValidator(validator)
+        self._qr_upper_hsv.setValidator(validator)
 
         self._qr_1.addWidget(self._qr_text)
         self._qr_1.addWidget(self._qr_btn)
@@ -67,6 +87,9 @@ class MyModes(QWidget):
         self._qr_2.addWidget(self._qr_upper_hsv)
         self._qr.addLayout(self._qr_1)
         self._qr.addLayout(self._qr_2)
+
+        #Update Colors Button
+        self._update_colors_btn = QPushButton('Update Colors')
 
         self._box_modes = QVBoxLayout()
 
@@ -79,7 +102,9 @@ class MyModes(QWidget):
         self._box_modes.addLayout(self._easy)
         self._box_modes.addLayout(self._hard)
         self._box_modes.addLayout(self._qr)
-        
+        self._box_modes.addWidget(self._update_colors_btn)
+
+        #Autonomous Modes Settings
         self._autonomous_label = QLabel('Autonomous Modes')
         self._autonomous_label.setStyleSheet(
             'font-size: 16px; font-weight: bold;'
@@ -96,6 +121,7 @@ class MyModes(QWidget):
         self._autonomous_modes.addWidget(self._semi_autonomous)
         self._autonomous_modes.addWidget(self._fully_autonomous)
 
+        #Overall Container
         self._container = QVBoxLayout(self)
         self._modes_label = QLabel('Modes')
         self._modes_label.setStyleSheet(
@@ -111,8 +137,61 @@ class MyModes(QWidget):
         
         self._container.setStretch(0, 1)
         self._container.setStretch(1, 5)
-        self._container.setStretch(2, 5)
+        self._container.setStretch(2, 3)
 
         self._title_layout.addStretch()
         self._box_modes.addStretch()
         self._autonomous_modes.addStretch()
+
+        #Function Triggers
+
+        self._update_colors_btn.clicked.connect(self._update_colors)
+
+        self._no_autonomous.clicked.connect(partial(self._update_autonomous, 0))
+        self._semi_autonomous.clicked.connect(partial(self._update_autonomous, 1))
+        self._fully_autonomous.clicked.connect(partial(self._update_autonomous, 2))
+
+        self._easy_btn.clicked.connect(partial(self._pick_box, 0))
+        self._hard_btn.clicked.connect(partial(self._pick_box, 1))
+        self._qr_btn.clicked.connect(partial(self._pick_box, 2))
+
+    def motion_started(self):
+        self._no_autonomous.setEnabled(False)
+        self._semi_autonomous.setEnabled(False)
+        self._fully_autonomous.setEnabled(False)
+        self._update_colors_btn.setEnabled(False)
+
+    def motion_stopped(self):
+        self._no_autonomous.setEnabled(True)
+        self._semi_autonomous.setEnabled(True)
+        self._fully_autonomous.setEnabled(True)
+        self._update_colors_btn.setEnabled(True)
+
+    def _get_text(self, wid:QLineEdit):
+        txt = wid.text()
+        if len(txt) > 0 and 0 <= int(txt) and int(txt) <= 255:
+            return int(txt)
+        else:
+            #Don't change default color
+            return -1
+
+    def _update_colors(self):
+        colors = []
+
+        colors.append(self._get_text(self._easy_lower_hsv))
+        colors.append(self._get_text(self._easy_upper_hsv))
+        colors.append(self._get_text(self._hard_lower_hsv))
+        colors.append(self._get_text(self._hard_upper_hsv))
+        colors.append(self._get_text(self._qr_lower_hsv))
+        colors.append(self._get_text(self._qr_upper_hsv))
+
+        print(f"New HSV Colors: {colors}")
+        self.colors_updated.emit(colors)
+
+    def _update_autonomous(self, mode:int):
+        print(f"Autonomous Mode: {mode}")
+        self.autonomous_updated.emit(mode)
+
+    def _pick_box(self, mode:int):
+        print(f"Picked boxes: {mode}")
+        self.boxes_picked.emit(mode)
