@@ -19,7 +19,7 @@ class MyModes(QWidget):
         palette.setColor(QPalette.ColorRole.Window, QColor("#3e3e3e"))
         self.setPalette(palette)
 
-        #Validator for LineEdits of HSV
+        #Validator for LineEdits of hue
         validator = QIntValidator(0, 255)
 
         #Easy Boxes Settings
@@ -32,15 +32,15 @@ class MyModes(QWidget):
         self._easy_btn = QPushButton()
         self._easy_btn.setText('Change Mode')
 
-        self._easy_lower_hsv = QLineEdit(placeholderText='Lower HSV')
-        self._easy_upper_hsv = QLineEdit(placeholderText='Upper HSV')
-        self._easy_lower_hsv.setValidator(validator)
-        self._easy_upper_hsv.setValidator(validator)
+        self._easy_lower_hue = QLineEdit(placeholderText='Lower Hue (0 - 359)')
+        self._easy_upper_hue = QLineEdit(placeholderText='Upper Hue (0 - 359)')
+        self._easy_lower_hue.setValidator(validator)
+        self._easy_upper_hue.setValidator(validator)
 
         self._easy_1.addWidget(self._easy_text)
         self._easy_1.addWidget(self._easy_btn)
-        self._easy_2.addWidget(self._easy_lower_hsv)
-        self._easy_2.addWidget(self._easy_upper_hsv)
+        self._easy_2.addWidget(self._easy_lower_hue)
+        self._easy_2.addWidget(self._easy_upper_hue)
         self._easy.addLayout(self._easy_1)
         self._easy.addLayout(self._easy_2)
 
@@ -54,15 +54,15 @@ class MyModes(QWidget):
         self._hard_btn = QPushButton()
         self._hard_btn.setText('Change Mode')
 
-        self._hard_lower_hsv = QLineEdit(placeholderText='Lower HSV')
-        self._hard_upper_hsv = QLineEdit(placeholderText='Upper HSV')
-        self._hard_lower_hsv.setValidator(validator)
-        self._hard_upper_hsv.setValidator(validator)
+        self._hard_lower_hue = QLineEdit(placeholderText='Lower Hue (0 - 359)')
+        self._hard_upper_hue = QLineEdit(placeholderText='Upper Hue (0 - 359)')
+        self._hard_lower_hue.setValidator(validator)
+        self._hard_upper_hue.setValidator(validator)
 
         self._hard_1.addWidget(self._hard_text)
         self._hard_1.addWidget(self._hard_btn)
-        self._hard_2.addWidget(self._hard_lower_hsv)
-        self._hard_2.addWidget(self._hard_upper_hsv)
+        self._hard_2.addWidget(self._hard_lower_hue)
+        self._hard_2.addWidget(self._hard_upper_hue)
         self._hard.addLayout(self._hard_1)
         self._hard.addLayout(self._hard_2)
 
@@ -76,15 +76,15 @@ class MyModes(QWidget):
         self._qr_btn = QPushButton()
         self._qr_btn.setText('Change Mode')
 
-        self._qr_lower_hsv = QLineEdit(placeholderText='Lower HSV')
-        self._qr_upper_hsv = QLineEdit(placeholderText='Upper HSV')
-        self._qr_lower_hsv.setValidator(validator)
-        self._qr_upper_hsv.setValidator(validator)
+        self._qr_lower_hue = QLineEdit(placeholderText='Lower Hue (0 - 359)')
+        self._qr_upper_hue = QLineEdit(placeholderText='Upper Hue (0 - 359)')
+        self._qr_lower_hue.setValidator(validator)
+        self._qr_upper_hue.setValidator(validator)
 
         self._qr_1.addWidget(self._qr_text)
         self._qr_1.addWidget(self._qr_btn)
-        self._qr_2.addWidget(self._qr_lower_hsv)
-        self._qr_2.addWidget(self._qr_upper_hsv)
+        self._qr_2.addWidget(self._qr_lower_hue)
+        self._qr_2.addWidget(self._qr_upper_hue)
         self._qr.addLayout(self._qr_1)
         self._qr.addLayout(self._qr_2)
 
@@ -169,8 +169,8 @@ class MyModes(QWidget):
 
     def _get_text(self, wid:QLineEdit):
         txt = wid.text()
-        if len(txt) > 0 and 0 <= int(txt) and int(txt) <= 255:
-            return int(txt)
+        if len(txt) > 0 and 0 <= int(txt) and int(txt) <= 359:
+            return int(txt) // 2
         else:
             #Don't change default color
             return -1
@@ -178,14 +178,14 @@ class MyModes(QWidget):
     def _update_colors(self):
         colors = []
 
-        colors.append(self._get_text(self._easy_lower_hsv))
-        colors.append(self._get_text(self._easy_upper_hsv))
-        colors.append(self._get_text(self._hard_lower_hsv))
-        colors.append(self._get_text(self._hard_upper_hsv))
-        colors.append(self._get_text(self._qr_lower_hsv))
-        colors.append(self._get_text(self._qr_upper_hsv))
+        colors.append(self._get_text(self._easy_lower_hue))
+        colors.append(self._get_text(self._easy_upper_hue))
+        colors.append(self._get_text(self._hard_lower_hue))
+        colors.append(self._get_text(self._hard_upper_hue))
+        colors.append(self._get_text(self._qr_lower_hue))
+        colors.append(self._get_text(self._qr_upper_hue))
 
-        print(f"New HSV Colors: {colors}")
+        print(f"New hue Colors: {colors}")
         self.colors_updated.emit(colors)
 
     def _update_autonomous(self, mode:int):

@@ -21,6 +21,8 @@ class Window(QMainWindow):
         self._central_layout = QVBoxLayout()
         self._central_layout.addWidget(self._camera)
         self._central_layout.addWidget(self._status)
+        self._central_layout.setStretch(0, 3)
+        self._central_layout.setStretch(1, 2)
 
         self._layout = QHBoxLayout()
         self._layout.addWidget(self._info)
