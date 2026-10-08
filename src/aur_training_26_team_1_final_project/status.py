@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 
 class MyStatus(QWidget):
+    motion_started = Signal()
+    motion_stopped = Signal()
 
     def __init__(self):
         
@@ -21,7 +23,7 @@ class MyStatus(QWidget):
         # Box Colors
         # It is okay to have lower hue greater than upper hue
         # It is intended to handle cyclic hue segments in OpenCV
-        self._colors = [(160, 255, 255), (10, 255, 255), (35, 255, 255), (85, 255, 255), (100, 255, 255), (140, 255, 255)]
+        self._colors = [160, 10, 35, 85, 100, 140]
 
         # 0 -> Disconnected, 1 -> Connected
         self._connection_status = 0
@@ -37,7 +39,10 @@ class MyStatus(QWidget):
 
         self._fps = 0
 
-        self._timer_label = QLabel('Timer: 10:00')
+        self._timer = QTimer()
+        self._time = 0
+
+        self._timer_label = QLabel('Timer: 00:00')
         self._timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._timer_label.setStyleSheet('font-size: 20px; font-weight: bold;')
 
@@ -50,21 +55,21 @@ class MyStatus(QWidget):
         self._autonomous_mode_label = QLabel('Autonomous Mode: None')
         self._autonomous_mode_label.setStyleSheet('font-size: 14px;')
 
-        self._boxes_picked_label = QLabel('Boxes Picked: Easy Boxes')
-        self._boxes_picked_label.setStyleSheet('font-size: 14px;')
+        self._picked_boxes_label = QLabel('Boxes Picked: Easy Boxes')
+        self._picked_boxes_label.setStyleSheet('font-size: 14px;')
 
-        self._motion_start_btn = QPushButton('Start')
+        self._motion_status_btn = QPushButton('Start')
 
         self._color_widgets = []
         self._color_widgets_layout = QVBoxLayout()
 
         for i in range(3):
             self._color_widgets.append(QWidget())
-            self._color_widgets[i].setStyleSheet(self._get_gradient_style_sheet(self._colors[i*2], self._colors[i*2+1]))
+            self._color_widgets[i].setStyleSheet(self._get_gradient_style_sheet((self._colors[i*2], 255, 255), (self._colors[i*2+1], 255, 255)))
             self._color_widgets_layout.addWidget(self._color_widgets[i])
 
         self._horizontal_layout = QHBoxLayout()
-        self._horizontal_layout.addWidget(self._boxes_picked_label)
+        self._horizontal_layout.addWidget(self._picked_boxes_label)
         self._horizontal_layout.addWidget(self._fps_label)
 
         self._horizontal_layout.setStretch(0, 3)
@@ -85,11 +90,105 @@ class MyStatus(QWidget):
         self._container = QVBoxLayout(self)
         self._container.addWidget(self._timer_label)
         self._container.addLayout(self._horizontal_layout_2)
-        self._container.addWidget(self._motion_start_btn)
+        self._container.addWidget(self._motion_status_btn)
 
         self._container.setStretch(0, 0)
         self._container.setStretch(1, 2)
         self._container.setStretch(2, 1)
+
+        self._motion_status_btn.clicked.connect(self._toggle_motion_status)
+
+    @property
+    def time(self):
+        return self._time
+
+    @time.setter
+    def time(self, new:int):
+        self._time = new
+        m = str((new // 60))
+        s = str((new % 60))
+        while len(m) < 2:
+            m = '0'+m
+        while len(s) < 2:
+            s = '0'+s
+        self._timer_label.setText(f"Timer: {m}:{s}")
+
+    @property
+    def fps(self):
+        return self._fps
+
+    @fps.setter
+    def fps(self, new:int):
+        self._fps = new
+        self._fps_label.setText(f"FPS: {self._fps}")
+
+    @property
+    def autonomous_mode(self):
+        return self._autonomous_mode
+
+    @autonomous_mode.setter
+    def autonomous_mode(self, new:int):
+        self._autonomous_mode = new
+        self._autonomous_mode_label.setText(f"Autonomous Mode: {self._autonomous_mode_msgs[new]}")
+
+    @property
+    def connection_status(self):
+        return self._connection_status
+
+    @connection_status.setter
+    def connection_status(self, new:int):
+        self._connection_status = new
+        self._connection_status_label.setText(f"Connection Status: {self._connection_status_msgs[new]}")
+        
+    @property
+    def picked_boxes(self):
+        return self._picked_boxes
+
+    @picked_boxes.setter
+    def picked_boxes(self, new:int):
+        self._picked_boxes = new
+        self._picked_boxes_label.setText(f"Picked Boxes: {self._picked_boxes_msgs[new]}")
+
+    @property
+    def colors(self):
+        return self._colors
+
+    @colors.setter
+    def colors(self, new:list):
+        for i in range(6):
+            if new[i] != -1:
+                self._colors[i] = new[i]
+
+        for i in range(3):
+            self._color_widgets[i].setStyleSheet(self._get_gradient_style_sheet((self._colors[i*2], 255, 255), (self._colors[i*2+1], 255, 255)))
+
+    def _toggle_motion_status(self):
+
+        if self._motion_status_btn.text() == 'Start':
+            self.motion_started.emit()
+            self._timer.setInterval(1000)
+            self.time = 600
+            self._timer.start()
+            self._timer.timeout.connect(self._update_time)
+
+            self._motion_status_btn.setText('Reset')
+        else:
+            self.motion_stopped.emit()
+            self._timer.stop()
+            self.time = 0
+            self._motion_status_btn.setText('Start')
+
+    def _update_time(self):
+        self.time -= 1
+        if self.time == 0:
+            self._toggle_motion_status()
+
+    def update_data(self, new_connection_status:int, new_autonomous_mode:int, new_picked_boxes:int, new_fps:int, new_colors:list):
+        self.connection_status = new_connection_status
+        self.autonomous_mode = new_autonomous_mode
+        self.picked_boxes = new_picked_boxes
+        self.fps = new_fps
+        self.colors = new_colors
 
     def _hsv_to_hex(self, hsv:tuple):
         # HSV_MAX = (179, 255, 255), OpenCV is used
