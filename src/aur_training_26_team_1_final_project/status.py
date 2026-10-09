@@ -58,7 +58,7 @@ class MyStatus(QWidget):
         self._autonomous_mode_label = QLabel('Autonomous Mode: None')
         self._autonomous_mode_label.setStyleSheet('font-size: 14px;')
 
-        self._picked_boxes_label = QLabel('Boxes Picked: Easy Boxes')
+        self._picked_boxes_label = QLabel('Picked Boxes: Easy Boxes')
         self._picked_boxes_label.setStyleSheet('font-size: 14px;')
 
         self._motion_status_btn = QPushButton('Start')
@@ -182,6 +182,21 @@ class MyStatus(QWidget):
         self.time -= 1
         if self.time == 0:
             self._toggle_motion_status()
+
+    def update_connection_status(self, new_connection_status:int):
+        self.connection_status = new_connection_status
+
+    def update_autonomous_mode(self, new_autonomous_mode:int):
+        self.autonomous_mode = new_autonomous_mode
+
+    def update_picked_boxes(self, new_picked_boxes:int):
+        self.picked_boxes = new_picked_boxes
+        
+    def update_fps(self, new_fps:int):
+        self.fps = new_fps
+
+    def update_colors(self, new_colors:list):
+        self.colors = new_colors
 
     def update_data(self, new_connection_status:int, new_autonomous_mode:int, new_picked_boxes:int, new_fps:int, new_colors:list):
         self.connection_status = new_connection_status

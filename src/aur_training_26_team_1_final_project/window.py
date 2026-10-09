@@ -38,5 +38,10 @@ class Window(QMainWindow):
         self.setCentralWidget(self._widget)
 
         self.show()
-                        
+
+        self._status.motion_started.connect(self._modes.motion_started)
+        self._status.motion_stopped.connect(self._modes.motion_stopped)
+        self._modes.autonomous_updated.connect(self._status.update_autonomous_mode)
+        self._modes.colors_updated.connect(self._status.update_colors)
+        self._modes.boxes_picked.connect(self._status.update_picked_boxes)                        
                 
