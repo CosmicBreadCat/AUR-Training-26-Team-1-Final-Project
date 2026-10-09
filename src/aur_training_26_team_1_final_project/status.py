@@ -192,8 +192,8 @@ class MyStatus(QWidget):
     def update_picked_boxes(self, new_picked_boxes:int):
         self.picked_boxes = new_picked_boxes
         
-    def update_fps(self, new_fps:int):
-        self.fps = new_fps
+    def update_fps(self, new_fps:float):
+        self.fps = int(new_fps)
 
     def update_colors(self, new_colors:list):
         self.colors = new_colors

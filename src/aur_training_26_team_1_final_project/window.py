@@ -44,4 +44,6 @@ class Window(QMainWindow):
         self._modes.autonomous_updated.connect(self._status.update_autonomous_mode)
         self._modes.colors_updated.connect(self._status.update_colors)
         self._modes.boxes_picked.connect(self._status.update_picked_boxes)                        
+        self._camera.fps_updated.connect(self._status.update_fps)
+        self._camera.connection_updated.connect(self._status.update_connection_status)
                 

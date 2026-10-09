@@ -1,3 +1,6 @@
+import os
+import sys
+import time
 import cv2
 from PySide6.QtCore import QThread, Signal, Qt
 from PySide6.QtGui import QImage, QPixmap
@@ -12,34 +15,46 @@ from PySide6.QtWidgets import (
 )
 
 class VideoCaptureThread(QThread):
-    # Signal to transmit the processed QImage to the UI thread
     frame_received = Signal(QImage)
     connection_failed = Signal(str)
 
     def __init__(self, stream_url: str):
         super().__init__()
         self._stream_url = stream_url
-        self._is_running = True
+        self.is_running = True
+        self.fps = 0.0
 
     def run(self):
-        # Open video capture stream (supports HTTP, RTSP, and local webcam indices)
         cap = cv2.VideoCapture(self._stream_url)
 
         if not cap.isOpened():
             self.connection_failed.emit(f"Could not connect to:\n{self._stream_url}")
             return
 
-        while self._is_running:
+        prev_time = time.time()
+        self.fps = 0.0
+        alpha = 0.9  # Smoothing factor to prevent jittery numbers
+
+        while self.is_running:
             ret, frame = cap.read()
             if not ret:
                 continue
 
-            # OpenCV outputs BGR; convert to RGB for Qt
+            # Calculate instantaneous and smoothed FPS
+            curr_time = time.time()
+            time_diff = curr_time - prev_time
+            prev_time = curr_time
+
+            if time_diff > 0:
+                current_fps = 1.0 / time_diff
+                # Exponential moving average filter
+                self.fps = (alpha * self.fps + (1.0 - alpha) * current_fps) if self.fps > 0 else current_fps
+
+            # Convert BGR to RGB
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb_frame.shape
             bytes_per_line = ch * w
 
-            # Construct QImage from raw numpy data
             q_image = QImage(
                 rgb_frame.data,
                 w,
@@ -48,23 +63,25 @@ class VideoCaptureThread(QThread):
                 QImage.Format.Format_RGB888
             )
 
-            # Emit a copy so memory remains valid across thread boundaries
             self.frame_received.emit(q_image.copy())
 
         cap.release()
 
     def stop(self):
-        self._is_running = False
+        self.is_running = False
+        self.fps = 0.0
         self.wait()
 
 
 class MyCamera(QWidget):
+    connection_updated = Signal(int)
+    fps_updated = Signal(float)
+
     def __init__(self):
         super().__init__()
 
-        self._cap_thread = None
+        self.cap_thread = None
 
-        # Controls
         self._ctrl_layout = QHBoxLayout()
         self._url_input = QLineEdit()
         self._url_input.setPlaceholderText("e.g., http://192.168.1.3:8080/video")
@@ -79,29 +96,34 @@ class MyCamera(QWidget):
         self._video_label = QLabel("Camera feed will appear here")
         self._video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._video_label.setStyleSheet("background-color: #1e1e1e; color: #888;")
-        
         self._layout = QVBoxLayout(self)
         self._layout.addLayout(self._ctrl_layout)
         self._layout.addWidget(self._video_label)
 
     def toggle_stream(self):
-        if self._cap_thread and self._cap_thread.isRunning():
+        if self.cap_thread and self.cap_thread.is_running == False:
+            self.connection_updated.emit(1)
+            self.stop_stream()
+        else:
+            self.connection_updated.emit((self.cap_thread == None or self.cap_thread.fps < 1.0))
+
+        if self.cap_thread and self.cap_thread.isRunning():
             self.stop_stream()
         else:
             url = self._url_input.text().strip()
             if not url:
                 QMessageBox.warning(self, "Error", "Please provide a valid stream URL.")
                 return
-
-            self._cap_thread = VideoCaptureThread(url)
-            self._cap_thread.frame_received.connect(self.update_frame)
-            self._cap_thread.connection_failed.connect(self.handle_error)
-            self._cap_thread.start()
+                
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
+            self.cap_thread = VideoCaptureThread(url)
+            self.cap_thread.frame_received.connect(self.update_frame)
+            self.cap_thread.connection_failed.connect(self.handle_error)
+            self.cap_thread.start()
 
             self._btn_connect.setText("Disconnect")
 
     def update_frame(self, image: QImage):
-        # Scale the pixmap smoothly to fit the QLabel bounds
         pixmap = QPixmap.fromImage(image)
         scaled_pixmap = pixmap.scaled(
             self._video_label.size(),
@@ -109,20 +131,21 @@ class MyCamera(QWidget):
             Qt.TransformationMode.SmoothTransformation
         )
         self._video_label.setPixmap(scaled_pixmap)
+        self.fps_updated.emit(self.cap_thread.fps)
 
     def handle_error(self, message: str):
         QMessageBox.critical(self, "Stream Error", message)
         self.stop_stream()
 
     def stop_stream(self):
-        if self._cap_thread:
-            self._cap_thread.stop()
-            self._cap_thread = None
+        if self.cap_thread:
+            self.cap_thread.stop()
+            self.cap_thread = None
         self._btn_connect.setText("Connect")
         self._video_label.clear()
         self._video_label.setText("Camera feed stopped")
+        self.fps_updated.emit(0.0)
 
     def closeEvent(self, event):
-        # Ensure thread cleanup when exiting the app
         self.stop_stream()
         event.accept()
