@@ -40,6 +40,9 @@ class MyStatus(QWidget):
         self._fps = 0
 
         self._timer = QTimer()
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._update_time)
+
         self._time = 0
 
         self._timer_label = QLabel('Timer: 00:00')
@@ -166,11 +169,8 @@ class MyStatus(QWidget):
 
         if self._motion_status_btn.text() == 'Start':
             self.motion_started.emit()
-            self._timer.setInterval(1000)
             self.time = 600
             self._timer.start()
-            self._timer.timeout.connect(self._update_time)
-
             self._motion_status_btn.setText('Reset')
         else:
             self.motion_stopped.emit()
