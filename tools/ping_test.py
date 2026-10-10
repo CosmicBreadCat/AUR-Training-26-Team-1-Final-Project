@@ -1,52 +1,27 @@
 #!/usr/bin/env python3
-"""UDP echo test for the ESP32 SoftAP.
-
-Connect the laptop to the "AUR-Team1-Robot" WiFi network first, then run:
-    python3 tools/udp_echo.py
-
-Sends MESSAGE once as JSON, waits for the echo, prints it, and exits.
-"""
-import json
-import socket
-import sys
+"""Ping the robot COUNT times and report round-trip time and loss."""
+import statistics
 import time
 
-HOST = "192.168.4.1"
-PORT = 5005
-TIMEOUT_S = 1.0
+from robot_link import RobotLink
 
-# Edit this to change what gets sent.
-MESSAGE = {
-    "type": "hello",
-    "seq": 1,
-    "data": {"v": 0.25, "omega": 0.0},
-}
+COUNT = 20
 
 
 def main():
-    payload = json.dumps(MESSAGE).encode()
+    with RobotLink() as robot:
+        rtts = []
+        for i in range(COUNT):
+            rtt = robot.ping(timeout=1.0)
+            print(f"ping {i + 1}: " + (f"{rtt:.1f} ms" if rtt is not None else "lost"))
+            if rtt is not None:
+                rtts.append(rtt)
+            time.sleep(0.05)
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(TIMEOUT_S)
-
-    print(f"sending {len(payload)} bytes to {HOST}:{PORT}: {payload.decode()}")
-    t0 = time.perf_counter()
-    sock.sendto(payload, (HOST, PORT))
-    try:
-        data, src = sock.recvfrom(2048)
-    except socket.timeout:
-        print(f"no reply within {TIMEOUT_S} s")
-        sys.exit(1)
-    rtt_ms = (time.perf_counter() - t0) * 1000
-
-    print(f"reply from {src[0]}:{src[1]} ({rtt_ms:.1f} ms)")
-    try:
-        reply = json.loads(data)
-    except json.JSONDecodeError:
-        print(f"reply is not valid JSON: {data!r}")
-        sys.exit(1)
-    print(json.dumps(reply, indent=2))
-    print("matches what was sent" if reply == MESSAGE else "DOES NOT match what was sent")
+    lost = COUNT - len(rtts)
+    print(f"\nreceived {len(rtts)}/{COUNT}, lost {lost} ({100 * lost / COUNT:.0f}%)")
+    if rtts:
+        print(f"RTT ms: min {min(rtts):.1f}  median {statistics.median(rtts):.1f}  max {max(rtts):.1f}")
 
 
 if __name__ == "__main__":
