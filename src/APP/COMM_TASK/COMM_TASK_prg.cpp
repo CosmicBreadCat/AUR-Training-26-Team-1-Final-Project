@@ -27,7 +27,7 @@ static uint32_t u32LastOdometryMs = 0;
 static uint32_t u32LastStatusMs = 0;
 static uint32_t u32LastTwistLogMs = 0;
 static uint32_t u32LastRxBad = 0;
-static int s32LastStationCount = -1;
+static bool bWasWifiUp = false;
 
 /* Length-1 mailboxes shared with other tasks */
 static QueueHandle_t xCommandMailbox = NULL;
@@ -102,11 +102,15 @@ static void vHandleTwist(const Command *Copy_pxCmd) {
 }
 
 static void vStep(void) {
-  int s32Stations = xComms.stationCount();
-  if (s32Stations != s32LastStationCount) {
-    Serial.printf("Stations connected: %d\n", s32Stations);
-    s32LastStationCount = s32Stations;
+  /* WiFi drops are logged only; the comms watchdog handles stopping */
+  bool bWifiUp = xComms.wifiConnected();
+  if (bWifiUp && !bWasWifiUp) {
+    Serial.printf("WiFi connected, IP %s\n",
+                  xComms.localIp().toString().c_str());
+  } else if (!bWifiUp && bWasWifiUp) {
+    Serial.println("WiFi lost, reconnecting");
   }
+  bWasWifiUp = bWifiUp;
 
   Command xCmd;
   while (xComms.poll(xCmd)) {
@@ -202,11 +206,16 @@ bool COMMTASK_bStart(void) {
   MotionCommand_t xInitial = {RobotMode::Stop, 0.0f, 0.0f, 0};
   xQueueOverwrite(xCommandMailbox, &xInitial);
 
+  Serial.printf("Joining \"%s\"...\n", UDP_WIFI_SSID);
   if (!xComms.begin()) {
     return false;
   }
-  Serial.printf("AP \"%s\" up, IP %s, UDP port %u\n", UDP_AP_SSID,
-                WiFi.softAPIP().toString().c_str(), UDP_LOCAL_PORT);
+  if (xComms.wifiConnected()) {
+    Serial.printf("WiFi up, IP %s, UDP port %u\n",
+                  xComms.localIp().toString().c_str(), UDP_LOCAL_PORT);
+  } else {
+    Serial.println("WiFi not up yet, retrying in background");
+  }
 
   return xTaskCreatePinnedToCore(vCommTask, "comm", COMMTASK_STACK_BYTES, NULL,
                                  COMMTASK_PRIORITY, NULL,

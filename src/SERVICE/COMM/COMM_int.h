@@ -13,7 +13,7 @@
  */
 class Comms {
 public:
-    /** @brief Starts the SoftAP and socket. @return false on failure. */
+    /** @brief Joins the router and opens the socket. @return false on failure. */
     bool begin();
 
     /**
@@ -39,7 +39,8 @@ public:
     /** @brief Why the most recent packet was rejected. */
     const char *lastReject() const { return lastReject_; }
 
-    int stationCount() const { return link_.stationCount(); }
+    bool wifiConnected() const { return link_.wifiConnected(); }
+    IPAddress localIp() const { return link_.localIp(); }
 
 private:
     void sendBuffer(size_t len);

@@ -6,8 +6,8 @@ How the laptop talks to the robot. If you use `tools/robot_link.py`, it handles 
 
 | | |
 |---|---|
-| WiFi network | `AUR-Team1-Robot`, password `robot1234` |
-| Robot address | `192.168.4.1`, UDP port `5005` |
+| WiFi network | team router, SSID and password in `src/SERVICE/UDP/UDP_cfg.h` (2.4 GHz); the robot, laptop and camera phone all join it |
+| Robot address | `192.168.69.50` (static, set in `src/SERVICE/UDP/UDP_cfg.h`), UDP port `5005` |
 | Format | one JSON object per UDP packet, max 1472 bytes |
 | Units | SI everywhere: m, rad, s, m/s, rad/s |
 

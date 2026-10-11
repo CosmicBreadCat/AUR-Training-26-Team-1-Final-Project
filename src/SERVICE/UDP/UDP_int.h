@@ -7,7 +7,7 @@
 #include "UDP_cfg.h"
 
 /*
- * Moves bytes between the ESP32 and the laptop over the SoftAP.
+ * Moves bytes between the ESP32 and the laptop over the router's WiFi.
  * Knows nothing about packet contents: the protocol layer validates packets
  * and calls acceptSender() for the good ones.
  * Not thread-safe: only one task should own an instance.
@@ -15,8 +15,10 @@
 class UdpLink {
 public:
     /**
-     * @brief Starts the SoftAP and binds the socket to UDP_LOCAL_PORT.
-     * @return false if either step fails.
+     * @brief Joins the router and binds the socket to UDP_LOCAL_PORT.
+     *        Waits up to UDP_CONNECT_TIMEOUT_MS for the router; if it isn't
+     *        up yet, carries on and keeps retrying in the background.
+     * @return false if the WiFi config or socket bind fails.
      */
     bool begin();
 
@@ -54,8 +56,11 @@ public:
      */
     uint32_t msSinceValidRx() const;
 
-    /** @brief Number of stations connected to the SoftAP. */
-    int stationCount() const;
+    /** @brief true while associated with the router and holding an IP. */
+    bool wifiConnected() const;
+
+    /** @brief The robot's own IP on the router network (0.0.0.0 if not connected). */
+    IPAddress localIp() const;
 
 private:
     WiFiUDP   udp_;

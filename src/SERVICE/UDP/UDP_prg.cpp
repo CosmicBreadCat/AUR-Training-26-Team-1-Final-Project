@@ -3,10 +3,19 @@
 #include "UDP_int.h"
 
 bool UdpLink::begin() {
-    WiFi.mode(WIFI_AP);
+    WiFi.mode(WIFI_STA);
     WiFi.setSleep(false);  // modem sleep adds tens of ms of latency
-    if (!WiFi.softAP(UDP_AP_SSID, UDP_AP_PASS, UDP_AP_CHANNEL, 0, UDP_AP_MAX_CLIENTS)) {
+    WiFi.setAutoReconnect(true);
+#if UDP_USE_STATIC_IP
+    if (!WiFi.config(IPAddress(UDP_STATIC_IP), IPAddress(UDP_GATEWAY), IPAddress(UDP_SUBNET))) {
         return false;
+    }
+#endif
+    WiFi.begin(UDP_WIFI_SSID, UDP_WIFI_PASS);
+
+    uint32_t start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < UDP_CONNECT_TIMEOUT_MS) {
+        delay(100);
     }
     return udp_.begin(UDP_LOCAL_PORT) == 1;
 }
@@ -43,6 +52,10 @@ uint32_t UdpLink::msSinceValidRx() const {
     return hasPeer() ? millis() - lastValidRxMs_ : UINT32_MAX;
 }
 
-int UdpLink::stationCount() const {
-    return WiFi.softAPgetStationNum();
+bool UdpLink::wifiConnected() const {
+    return WiFi.status() == WL_CONNECTED;
+}
+
+IPAddress UdpLink::localIp() const {
+    return WiFi.localIP();
 }
