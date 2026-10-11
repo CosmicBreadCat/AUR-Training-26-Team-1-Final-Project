@@ -57,5 +57,5 @@ void PWM_vSetServoAngle(PWM_SpeedMode_t Copy_xMode,
     uint32_t u32MaxDuty = (1 << LEDC_SERVO_PWM_RES) - 1;
     uint32_t u32DutyTicks = (u32PulseUs * u32MaxDuty) / 20000;
 
-    LEDC_vSetDuty(Copy_xMode, Copy_xChannel, u32DutyTicks);
+    PWM_vSetDuty(Copy_xMode, Copy_xChannel, u32DutyTicks);
 }
