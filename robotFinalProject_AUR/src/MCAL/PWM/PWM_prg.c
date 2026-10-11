@@ -1,8 +1,8 @@
 #include "PWM_int.h"
 #include "PWM_cfg.h"
 
-void LEDC_vInitTimer(LEDC_SpeedMode_t Copy_xMode, 
-                     LEDC_TimerNum_t Copy_xTimer, 
+void PWM_vInitTimer(PWM_SpeedMode_t Copy_xMode, 
+                     PWM_TimerNum_t Copy_xTimer, 
                      uint32_t Copy_u32FreqHz, 
                      ledc_timer_bit_t Copy_xResolution) {
     ledc_timer_config_t xTimerConfig = {
@@ -15,10 +15,10 @@ void LEDC_vInitTimer(LEDC_SpeedMode_t Copy_xMode,
     ledc_timer_config(&xTimerConfig);
 }
 
-void LEDC_vInitChannel(LEDC_SpeedMode_t Copy_xMode, 
-                       LEDC_ChannelNum_t Copy_xChannel, 
-                       LEDC_TimerNum_t Copy_xTimer, 
-                       uint8_t Copy_u8GpioNum) {
+void PWM_vInitChannel(PWM_SpeedMode_t Copy_xMode, 
+                      PWM_ChannelNum_t Copy_xChannel, 
+                      PWM_TimerNum_t Copy_xTimer, 
+                      uint8_t Copy_u8GpioNum) {
     ledc_channel_config_t xChannelConfig = {
         .speed_mode = (ledc_mode_t)Copy_xMode,
         .channel    = (ledc_channel_t)Copy_xChannel,
@@ -31,15 +31,15 @@ void LEDC_vInitChannel(LEDC_SpeedMode_t Copy_xMode,
     ledc_channel_config(&xChannelConfig);
 }
 
-void LEDC_vSetDuty(LEDC_SpeedMode_t Copy_xMode, 
-                   LEDC_ChannelNum_t Copy_xChannel, 
+void PWM_vSetDuty(PWM_SpeedMode_t Copy_xMode, 
+                   PWM_ChannelNum_t Copy_xChannel, 
                    uint32_t Copy_u32Duty) {
     ledc_set_duty((ledc_mode_t)Copy_xMode, (ledc_channel_t)Copy_xChannel, Copy_u32Duty);
     ledc_update_duty((ledc_mode_t)Copy_xMode, (ledc_channel_t)Copy_xChannel);
 }
 
-void LEDC_vSetServoAngle(LEDC_SpeedMode_t Copy_xMode, 
-                         LEDC_ChannelNum_t Copy_xChannel, 
+void PWM_vSetServoAngle(PWM_SpeedMode_t Copy_xMode, 
+                         PWM_ChannelNum_t Copy_xChannel, 
                          uint8_t Copy_u8Angle) {
     if (Copy_u8Angle > 180) {
         Copy_u8Angle = 180;

@@ -1,34 +1,34 @@
-#ifndef LEDC_INT_H_
-#define LEDC_INT_H_
+#ifndef PWM_INT_H_
+#define PWM_INT_H_
 
 #include <stdint.h>
 #include "driver/ledc.h"
 
 /* Speed Modes */
 typedef enum {
-    LEDC_MODE_HIGH_SPEED = LEDC_HIGH_SPEED_MODE,
-    LEDC_MODE_LOW_SPEED  = LEDC_LOW_SPEED_MODE
-} LEDC_SpeedMode_t;
+    PWM_MODE_HIGH_SPEED = HIGHSPEED,
+    PWM_MODE_LOW_SPEED  = LOWSPEED
+} PWM_SpeedMode_t;
 
 /* Timers */
 typedef enum {
-    LEDC_TIMER_INDEX_0 = LEDC_TIMER_0,
-    LEDC_TIMER_INDEX_1 = LEDC_TIMER_1,
-    LEDC_TIMER_INDEX_2 = LEDC_TIMER_2,
-    LEDC_TIMER_INDEX_3 = LEDC_TIMER_3
-} LEDC_TimerNum_t;
+    PWM_TIMER_INDEX_0 = TIMER_0,
+    PWM_TIMER_INDEX_1 = TIMER_1,
+    PWM_TIMER_INDEX_2 = TIMER_2,
+    PWM_TIMER_INDEX_3 = TIMER_3
+} PWM_TimerNum_t;
 
 /* Channels */
 typedef enum {
-    LEDC_CHANNEL_INDEX_0 = LEDC_CHANNEL_0,
-    LEDC_CHANNEL_INDEX_1 = LEDC_CHANNEL_1,
-    LEDC_CHANNEL_INDEX_2 = LEDC_CHANNEL_2,
-    LEDC_CHANNEL_INDEX_3 = LEDC_CHANNEL_3,
-    LEDC_CHANNEL_INDEX_4 = LEDC_CHANNEL_4,
-    LEDC_CHANNEL_INDEX_5 = LEDC_CHANNEL_5,
-    LEDC_CHANNEL_INDEX_6 = LEDC_CHANNEL_6,
-    LEDC_CHANNEL_INDEX_7 = LEDC_CHANNEL_7
-} LEDC_ChannelNum_t;
+    PWM_CHANNEL_INDEX_0 = CH_0,
+    PWM_CHANNEL_INDEX_1 = CH_1,
+    PWM_CHANNEL_INDEX_2 = CH_2,
+    PWM_CHANNEL_INDEX_3 = CH_3,
+    PWM_CHANNEL_INDEX_4 = CH_4,
+    PWM_CHANNEL_INDEX_5 = CH_5,
+    PWM_CHANNEL_INDEX_6 = CH_6,
+    PWM_CHANNEL_INDEX_7 = CH_7
+} PWM_ChannelNum_t;
 
 /* Function Prototypes */
 
@@ -39,8 +39,8 @@ typedef enum {
  * @param Copy_u32FreqHz Desired PWM frequency in Hz.
  * @param Copy_xResolution Bit resolution for duty cycle precision.
  */
-void LEDC_vInitTimer(LEDC_SpeedMode_t Copy_xMode, 
-                     LEDC_TimerNum_t Copy_xTimer, 
+void PWM_vInitTimer(PWM_SpeedMode_t Copy_xMode, 
+                     PWM_TimerNum_t Copy_xTimer, 
                      uint32_t Copy_u32FreqHz, 
                      ledc_timer_bit_t Copy_xResolution);
 
@@ -51,10 +51,10 @@ void LEDC_vInitTimer(LEDC_SpeedMode_t Copy_xMode,
  * @param Copy_xTimer Hardware timer assigned to this channel.
  * @param Copy_u8GpioNum GPIO pin number outputting the PWM.
  */
-void LEDC_vInitChannel(LEDC_SpeedMode_t Copy_xMode, 
-                       LEDC_ChannelNum_t Copy_xChannel, 
-                       LEDC_TimerNum_t Copy_xTimer, 
-                       uint8_t Copy_u8GpioNum);
+void PWM_vInitChannel(PWM_SpeedMode_t Copy_xMode, 
+                      PWM_ChannelNum_t Copy_xChannel, 
+                      PWM_TimerNum_t Copy_xTimer, 
+                      uint8_t Copy_u8GpioNum);
 
 /**
  * @brief Sets raw duty cycle for motor speed control or general PWM.
@@ -62,8 +62,8 @@ void LEDC_vInitChannel(LEDC_SpeedMode_t Copy_xMode,
  * @param Copy_xChannel Target PWM channel.
  * @param Copy_u32Duty Duty cycle integer value.
  */
-void LEDC_vSetDuty(LEDC_SpeedMode_t Copy_xMode, 
-                   LEDC_ChannelNum_t Copy_xChannel, 
+void PWM_vSetDuty(PWM_SpeedMode_t Copy_xMode, 
+                   PWM_ChannelNum_t Copy_xChannel, 
                    uint32_t Copy_u32Duty);
 
 /**
@@ -72,8 +72,8 @@ void LEDC_vSetDuty(LEDC_SpeedMode_t Copy_xMode,
  * @param Copy_xChannel Target PWM channel connected to the servo.
  * @param Copy_u8Angle Desired angle in degrees (0 - 180).
  */
-void LEDC_vSetServoAngle(LEDC_SpeedMode_t Copy_xMode, 
-                         LEDC_ChannelNum_t Copy_xChannel, 
+void PWM_vSetServoAngle(PWM_SpeedMode_t Copy_xMode, 
+                         PWM_ChannelNum_t Copy_xChannel, 
                          uint8_t Copy_u8Angle);
 
-#endif /* LEDC_INT_H_ */
+#endif /* PWM_INT_H_ */
