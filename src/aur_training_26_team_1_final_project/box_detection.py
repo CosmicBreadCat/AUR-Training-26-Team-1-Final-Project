@@ -4,6 +4,7 @@ from PySide6.QtCore import QObject, Property, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 class MyDetector(QObject):
+    new_data_sent = Signal()
 
     def __init__(self):
         super().__init__()
@@ -27,6 +28,19 @@ class MyDetector(QObject):
     
         frame_bgr = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
         return frame_bgr
+
+    def cv2_to_qimage(self, frame):
+        rgb_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        height, width, _ = rgb_img.shape
+        bytes_per_line = 3 * width
+        q_img = QImage(
+            rgb_img.data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format.Format_RGB888,
+        )
+        return q_img.copy()
 
     def get_mask(self, idx, frame):
 
@@ -62,7 +76,7 @@ class MyDetector(QObject):
         return decoded_data
     
 
-    def edit_image(self, qframe:QImage):
+    def get_data(self, qframe:QImage):
 
         frame = self.qimage_to_cv2(qframe)
         
@@ -89,15 +103,17 @@ class MyDetector(QObject):
                 points = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
 
                 M = cv2.moments(points)
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
+                if M["m00"] == 0:
+                    cx = cy = None
+                else:
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
 
                 boxes.append({"cx": cx, "cy": cy, "type": i, "points": points})
 
                 range_ = (self._colors[i*2+1]-self._colors[i*2]+180)%180
 
                 frame = cv2.drawContours(frame, [points], 0, ((self._colors[i*2]+range_//2)%180, 255, 255), 2)
-
 
         frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
 
@@ -107,15 +123,21 @@ class MyDetector(QObject):
             points = data["points"]
             points = np.int32(points).reshape((-1, 1, 2))
             data["points"] = points.astype(int)
-            frame = cv2.drawContours(frame, [points], 0, (0, 255, 255), 2)
+            # For debugging purposes
+            # frame = cv2.drawContours(frame, [points], 0, (0, 255, 255), 2)
         
         results = {
-            "masks": {
-                "easy": masks[0],
-                "hard": masks[1],
-                "qr": masks[2]
-            },
-            "qr_readings": decoded_data
+            "qr_readings": decoded_data,
+            # For debugging purposes
+            # "frame": frame,
+            "boxes": boxes
         }
+        
+        self.new_data_sent.emit()
 
         return results
+
+    def update_colors(self, new:list):
+        for i in range(6):
+            if new[i] != -1:
+                self._colors[i] = new[i]

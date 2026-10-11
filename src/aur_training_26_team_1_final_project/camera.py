@@ -2,7 +2,7 @@ import os
 import sys
 import time
 import cv2
-from PySide6.QtCore import QThread, Signal, Qt
+from PySide6.QtCore import QThread, Signal, Qt, QTimer
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QWidget,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox
 )
+from aur_training_26_team_1_final_project.box_detection import MyDetector
 
 class VideoCaptureThread(QThread):
     frame_received = Signal(QImage)
@@ -81,6 +82,7 @@ class MyCamera(QWidget):
         super().__init__()
 
         self.cap_thread = None
+        self.detector = MyDetector()
 
         self._ctrl_layout = QHBoxLayout()
         self._url_input = QLineEdit()
@@ -91,6 +93,14 @@ class MyCamera(QWidget):
         self._ctrl_layout.addWidget(QLabel("Stream URL:"))
         self._ctrl_layout.addWidget(self._url_input)
         self._ctrl_layout.addWidget(self._btn_connect)
+
+        self._timer = QTimer()
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._get_data)
+        self._timer.start()
+
+        self._prev_frame = None
+        self._data = None
 
         # Video Display Label
         self._video_label = QLabel("Camera feed will appear here")
@@ -115,7 +125,6 @@ class MyCamera(QWidget):
                 QMessageBox.warning(self, "Error", "Please provide a valid stream URL.")
                 return
                 
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
             self.cap_thread = VideoCaptureThread(url)
             self.cap_thread.frame_received.connect(self.update_frame)
             self.cap_thread.connection_failed.connect(self.handle_error)
@@ -124,6 +133,7 @@ class MyCamera(QWidget):
             self._btn_connect.setText("Disconnect")
 
     def update_frame(self, image: QImage):
+        self._prev_frame = image
         pixmap = QPixmap.fromImage(image)
         scaled_pixmap = pixmap.scaled(
             self._video_label.size(),
@@ -132,6 +142,12 @@ class MyCamera(QWidget):
         )
         self._video_label.setPixmap(scaled_pixmap)
         self.fps_updated.emit(self.cap_thread.fps)
+
+    def _get_data(self):
+        if self._prev_frame == None:
+            return
+        self._data = self.detector.get_data(self._prev_frame)
+        print(self._data)
 
     def handle_error(self, message: str):
         QMessageBox.critical(self, "Stream Error", message)
