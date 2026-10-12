@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import QMainWindow, QHBoxLayout, QVBoxLayout, QWidget
-from aur_training_26_team_1_final_project.modes import MyModes
-from aur_training_26_team_1_final_project.info import MyInfo
-from aur_training_26_team_1_final_project.status import MyStatus
-from aur_training_26_team_1_final_project.camera import MyCamera
-from aur_training_26_team_1_final_project.controller import MyController
-from aur_training_26_team_1_final_project.comm import MyCommunicationChannel
+from aur_training_26_team_1_final_project.gui.modes import MyModes
+from aur_training_26_team_1_final_project.gui.info import MyInfo
+from aur_training_26_team_1_final_project.gui.status import MyStatus
+from aur_training_26_team_1_final_project.cv.camera import MyCamera
+from aur_training_26_team_1_final_project.comms.controller import MyController
+from aur_training_26_team_1_final_project.comms.comm import MyCommunicationChannel
 
 
 class Window(QMainWindow):

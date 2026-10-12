@@ -1,5 +1,5 @@
-from aur_training_26_team_1_final_project.robotlink import RobotLink
-from PySide6.QtCore import QObject, QTimer
+from aur_training_26_team_1_final_project.comms.robotlink import RobotLink
+from PySide6.QtCore import QObject
 import math
 
 class MyCommunicationChannel(QObject):
@@ -36,6 +36,8 @@ class MyCommunicationChannel(QObject):
         else:
             omega = math.atan(v_y/v_x)
 
+        vel = round(vel, 3)
+        omega = round(omega, 3)
         print(vel, omega)
         return vel, omega
 

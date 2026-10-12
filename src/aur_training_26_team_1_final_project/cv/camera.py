@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox
 )
-from aur_training_26_team_1_final_project.box_detection import MyDetector
+from aur_training_26_team_1_final_project.cv.box_detection import MyDetector
 
 class VideoCaptureThread(QThread):
     frame_received = Signal(QImage)
