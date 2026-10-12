@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "opencv-python>=5.0.0.93",
+    "pygame>=2.6.1",
     "pyqt6>=6.11.0",
     "pyside6>=6.11.2",
 ]

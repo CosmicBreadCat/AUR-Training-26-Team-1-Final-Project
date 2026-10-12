@@ -3,6 +3,8 @@ from aur_training_26_team_1_final_project.modes import MyModes
 from aur_training_26_team_1_final_project.info import MyInfo
 from aur_training_26_team_1_final_project.status import MyStatus
 from aur_training_26_team_1_final_project.camera import MyCamera
+from aur_training_26_team_1_final_project.controller import MyController
+from aur_training_26_team_1_final_project.comm import MyCommunicationChannel
 
 
 class Window(QMainWindow):
@@ -17,6 +19,8 @@ class Window(QMainWindow):
         self._info = MyInfo()
         self._status = MyStatus()
         self._camera = MyCamera()
+        self._controller = MyController()
+        self._comm = MyCommunicationChannel()
 
         self._central_layout = QVBoxLayout()
         self._central_layout.addWidget(self._camera)
@@ -47,4 +51,4 @@ class Window(QMainWindow):
         self._modes.boxes_picked.connect(self._status.update_picked_boxes)                        
         self._camera.fps_updated.connect(self._status.update_fps)
         self._camera.connection_updated.connect(self._status.update_connection_status)
-                
+        self._controller.controller_input_updated.connect(self._comm.get_input)     
