@@ -1,5 +1,5 @@
-#include <Arduino.h>
 #include "APP/COMM_TASK/COMM_TASK_int.h"
+#include <Arduino.h>
 
 void setup() {
   Serial.begin(115200);
@@ -11,5 +11,5 @@ void setup() {
 }
 
 void loop() {
-  vTaskDelete(NULL);  // all work happens in tasks
+  vTaskDelete(NULL); // all work happens in tasks
 }
