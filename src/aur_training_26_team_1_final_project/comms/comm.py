@@ -38,10 +38,10 @@ class MyCommunicationChannel(QObject):
 
         vel = round(vel, 3)
         omega = round(omega, 3)
-        print(vel, omega)
         return vel, omega
 
     def _set_twist_mode(self):
+        self._mode = "TWIST"
         self._robotlink.set_mode("TWIST")
     
     def _run_twist_mode(self):

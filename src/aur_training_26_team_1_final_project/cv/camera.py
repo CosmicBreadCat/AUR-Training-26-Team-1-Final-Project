@@ -147,7 +147,9 @@ class MyCamera(QWidget):
         if self._prev_frame == None:
             return
         self._data = self.detector.get_data(self._prev_frame)
-        print(self._data)
+
+        # For debugging
+        # print(self._data)
 
     def handle_error(self, message: str):
         QMessageBox.critical(self, "Stream Error", message)

@@ -35,36 +35,32 @@ class MyController(QObject):
 
     def _get_data(self):
 
-        try:
-            while True:
-                # Process internal events to refresh controller states
-                pygame.event.pump()
+        try: 
+            # Process internal events to refresh controller states
+            pygame.event.pump()
 
-                data = []
+            data = []
 
-                # 1. Analog Inputs (Joysticks & Triggers, range typically -1.0 to 1.0)
-                axes = [round(self._controller.get_axis(i), 3) for i in range(self._controller.get_numaxes())]
+            # 1. Analog Inputs (Joysticks & Triggers, range typically -1.0 to 1.0)
+            axes = [round(self._controller.get_axis(i), 3) for i in range(self._controller.get_numaxes())]
 
-                for i in axes:
-                    data.append(i)
+            for i in axes:
+                data.append(i)
 
-                # 2. Digital Inputs (Buttons: 0 = Released, 1 = Pressed)
-                buttons = [self._controller.get_button(i) for i in range(self._controller.get_numbuttons())]
+            # 2. Digital Inputs (Buttons: 0 = Released, 1 = Pressed)
+            buttons = [self._controller.get_button(i) for i in range(self._controller.get_numbuttons())]
 
-                for i in buttons:
-                    data.append(i)
+            for i in buttons:
+                data.append(i)
 
-                # 3. D-Pad / Hats (returns a tuple like (x, y) with -1, 0, or 1)
-                hats = [self._controller.get_hat(i) for i in range(self._controller.get_numhats())]
+            # 3. D-Pad / Hats (returns a tuple like (x, y) with -1, 0, or 1)
+            hats = [self._controller.get_hat(i) for i in range(self._controller.get_numhats())]
 
-                # For debugging
-                # print(f"\rAxes (Analog): {axes} | Buttons: {buttons} | Hats: {hats}", end="", flush=True)
+            # For debugging
+            # print(f"\rAxes (Analog): {axes} | Buttons: {buttons} | Hats: {hats}", end="", flush=True)
 
-                self.controller_input_updated.emit(data)
-                    
-                time.sleep(1.0/self.FREQ)
+            self.controller_input_updated.emit(data)
 
-        except KeyboardInterrupt:
-            print("\nController Disconnected")
-        finally:
-            pygame.quit()
+        except pygame.error as e:
+            print(f"Controller error: {e}")
+            self._timer.stop()

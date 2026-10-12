@@ -9,7 +9,6 @@ class MyDetector(QObject):
     def __init__(self):
         super().__init__()
 
-        print("")
         #Hue Colors
         self._colors = [160, 10, 35, 85, 100, 140]
         
