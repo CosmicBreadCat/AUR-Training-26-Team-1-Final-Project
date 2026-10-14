@@ -69,6 +69,11 @@ class MyInfo(QWidget):
     def update_qr_boxes_dropped(self, new_coord: tuple):
         self._data.qr_boxes_dropped.append(new_coord)
 
+    def update_qr_boxes_detected(self, new: list):
+        self._data.qr_boxes_detected = []
+        for qr_code in new:
+            self._data.qr_boxes_detected.append(qr_code["text"])
+
     def _update_widgets(self):
         
         self._linear_speed_label.setText(f'Linear Speed: {self._data.linear_speed}')

@@ -4,7 +4,6 @@ from PySide6.QtCore import QObject, Property, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 class MyDetector(QObject):
-    new_data_sent = Signal()
 
     def __init__(self):
         super().__init__()
@@ -131,8 +130,6 @@ class MyDetector(QObject):
             # "frame": frame,
             "boxes": boxes
         }
-        
-        self.new_data_sent.emit()
 
         return results
 

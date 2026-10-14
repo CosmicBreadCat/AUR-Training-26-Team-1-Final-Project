@@ -77,6 +77,7 @@ class VideoCaptureThread(QThread):
 class MyCamera(QWidget):
     connection_updated = Signal(int)
     fps_updated = Signal(float)
+    data_updated = Signal(list)
 
     def __init__(self):
         super().__init__()
@@ -148,6 +149,7 @@ class MyCamera(QWidget):
             return
         self._data = self.detector.get_data(self._prev_frame)
 
+        self.data_updated.emit(self._data["qr_readings"])
         # For debugging
         # print(self._data)
 

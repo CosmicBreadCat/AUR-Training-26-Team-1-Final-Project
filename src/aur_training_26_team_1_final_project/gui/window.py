@@ -52,19 +52,7 @@ class Window(QMainWindow):
         self._worker.finished.connect(self._worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
 
-        # self._worker.updated_odometry_data.connect(self.handle_incoming_data)
-        # self._worker.connection_status.connect(self.update_status)
-
         self.thread.start()
-
-        def handle_incoming_data(self, message: str):
-            self.log_view.append(message)
-
-        def update_status(self, is_connected: bool):
-            if not is_connected:
-                self.log_view.append("--- Disconnected ---")
-                self.start_btn.setEnabled(True)
-                self.stop_btn.setEnabled(False)
 
         self._status.motion_started.connect(self._modes.motion_started)
         self._status.motion_stopped.connect(self._modes.motion_stopped)
@@ -76,6 +64,7 @@ class Window(QMainWindow):
 
         self._camera.fps_updated.connect(self._status.update_fps)
         self._camera.connection_updated.connect(self._status.update_connection_status)
+        self._camera.data_updated.connect(self._info.update_qr_boxes_detected)
 
         self._controller.controller_input_updated.connect(self._worker.get_input)   
 
