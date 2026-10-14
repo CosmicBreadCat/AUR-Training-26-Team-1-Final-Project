@@ -7,6 +7,6 @@
 #define PROTOCOL_VERSION 1
 
 /* Largest encoded robot -> laptop message, in bytes */
-#define PROTOCOL_TX_BUF_SIZE 256
+#define PROTOCOL_TX_BUF_SIZE 320
 
 #endif /* PROTOCOL_CFG_H_ */

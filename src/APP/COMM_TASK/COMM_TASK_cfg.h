@@ -15,4 +15,8 @@
 /* Serial log of the current twist while in TWIST */
 #define COMMTASK_TWIST_LOG_MS 500
 
+/* Gripper state assumed at boot, before any gripper command arrives */
+#define COMMTASK_GRIPPER_BOOT_LIFT LiftState::Up
+#define COMMTASK_GRIPPER_BOOT_GRIP GripState::Open
+
 #endif /* COMM_TASK_CFG_H_ */

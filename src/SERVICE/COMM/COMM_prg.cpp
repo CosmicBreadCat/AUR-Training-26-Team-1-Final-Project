@@ -54,6 +54,11 @@ void Comms::sendOdometry(const Odometry &odom) {
       proto_.encodeOdometry(odom, ++txSeq_, millis(), txBuf_, sizeof(txBuf_)));
 }
 
+void Comms::sendSensors(const Sensors &sensors) {
+  sendBuffer(
+      proto_.encodeSensors(sensors, ++txSeq_, millis(), txBuf_, sizeof(txBuf_)));
+}
+
 void Comms::sendStatus(Status status) {
   status.rxOk = rxOk_;
   status.rxBad = rxBad_;

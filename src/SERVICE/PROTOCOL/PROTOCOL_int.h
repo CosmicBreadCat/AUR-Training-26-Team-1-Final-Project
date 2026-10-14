@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 /* Laptop -> robot message types */
-enum class MsgType : uint8_t { Mode, Twist, WheelVel, Heartbeat, Ping };
+enum class MsgType : uint8_t { Mode, Twist, WheelVel, Gripper, Heartbeat, Ping };
 
 /* Robot behaviors, selected by a `mode` message */
 enum class RobotMode : uint8_t {
@@ -22,6 +22,10 @@ enum class RobotMode : uint8_t {
 
 /* Outcome of the command named by Status::cmdSeq */
 enum class Result : uint8_t { Running, Done, Failed, Preempted };
+
+/* Gripper servo states, set by a `gripper` message */
+enum class LiftState : uint8_t { Up, Down };
+enum class GripState : uint8_t { Open, Closed };
 
 /* Optional `mode` parameters. Absent ones are NAN. */
 struct ModeParams {
@@ -47,6 +51,10 @@ struct Command {
   float omega;       // Twist (rad/s)
   float wl;          // WheelVel (rad/s)
   float wr;          // WheelVel (rad/s)
+  bool hasLift;      // Gripper: lift was given
+  LiftState lift;    // Gripper
+  bool hasGrip;      // Gripper: grip was given
+  GripState grip;    // Gripper
 };
 
 struct Odometry {
@@ -57,12 +65,18 @@ struct Odometry {
   float omega; // rad/s
 };
 
+struct Sensors {
+  float rangeM; // ultrasonic range (m), NAN when there is no reading
+};
+
 struct Status {
   RobotMode mode;
   const char *phase; // mode-specific, e.g. "IDLE", "DRIVING"
   Result result;
   const char *reason; // "" unless Failed
   uint32_t cmdSeq;    // seq of the mode command this result belongs to
+  LiftState lift;     // current commanded gripper state
+  GripState grip;
   bool watchdog;
   uint32_t rxOk;
   uint32_t rxBad;
@@ -70,6 +84,8 @@ struct Status {
 
 const char *PROTOCOL_pcModeName(RobotMode mode);
 const char *PROTOCOL_pcResultName(Result result);
+const char *PROTOCOL_pcLiftName(LiftState lift);
+const char *PROTOCOL_pcGripName(GripState grip);
 
 /*
  * JSON encode/decode for schema v1. No WiFi or clock dependency: callers
@@ -96,6 +112,8 @@ public:
                         uint8_t *buf, size_t cap);
   size_t encodeStatus(const Status &status, uint32_t seq, uint32_t t,
                       uint8_t *buf, size_t cap);
+  size_t encodeSensors(const Sensors &sensors, uint32_t seq, uint32_t t,
+                       uint8_t *buf, size_t cap);
   size_t encodeAck(uint32_t ackSeq, bool ok, const char *err, uint32_t seq,
                    uint32_t t, uint8_t *buf, size_t cap);
   size_t encodePong(uint32_t pingT, uint32_t seq, uint32_t t, uint8_t *buf,

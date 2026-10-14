@@ -8,8 +8,8 @@
 
 /*
  * Robot side of the laptop link: UDP transport + JSON protocol + watchdog.
- * Answers ping and heartbeat itself and hands mode/twist/wheel_vel commands
- * to the caller. Not thread-safe: one task owns it.
+ * Answers ping and heartbeat itself and hands mode/twist/wheel_vel/gripper
+ * commands to the caller. Not thread-safe: one task owns it.
  */
 class Comms {
 public:
@@ -19,7 +19,7 @@ public:
   /**
    * @brief Non-blocking. Processes waiting packets until one needs the
    *        caller's attention. Call repeatedly until it returns false.
-   * @param out Set to the next mode/twist/wheel_vel command.
+   * @param out Set to the next mode/twist/wheel_vel/gripper command.
    * @return true if out holds a command.
    */
   bool poll(Command &out);
@@ -29,6 +29,7 @@ public:
 
   void sendAck(uint32_t ackSeq, bool ok, const char *err);
   void sendOdometry(const Odometry &odom);
+  void sendSensors(const Sensors &sensors);
 
   /** @brief Sends status. rxOk/rxBad are filled in here. */
   void sendStatus(Status status);

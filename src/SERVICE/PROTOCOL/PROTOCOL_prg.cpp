@@ -8,6 +8,12 @@ static const char *const kModeNames[] = {"STOP", "WHEEL_VEL", "TWIST",   "MOVE",
 static const char *const kResultNames[] = {"RUNNING", "DONE", "FAILED",
                                            "PREEMPTED"};
 
+/* Each table must list names in the same order as its enum */
+static const char *const kLiftNames[] = {"UP", "DOWN"};
+static const char *const kGripNames[] = {"OPEN", "CLOSED"};
+
+#define COUNT_OF(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 const char *PROTOCOL_pcModeName(RobotMode mode) {
   return kModeNames[(uint8_t)mode];
 }
@@ -16,10 +22,24 @@ const char *PROTOCOL_pcResultName(Result result) {
   return kResultNames[(uint8_t)result];
 }
 
-static bool parseModeName(const char *name, RobotMode &out) {
-  for (uint8_t i = 0; i < sizeof(kModeNames) / sizeof(kModeNames[0]); i++) {
-    if (strcmp(name, kModeNames[i]) == 0) {
-      out = (RobotMode)i;
+const char *PROTOCOL_pcLiftName(LiftState lift) {
+  return kLiftNames[(uint8_t)lift];
+}
+
+const char *PROTOCOL_pcGripName(GripState grip) {
+  return kGripNames[(uint8_t)grip];
+}
+
+/* Finds name in a table; out is its index, i.e. the enum value */
+static bool parseName(JsonVariantConst value, const char *const *names,
+                      uint8_t count, uint8_t &out) {
+  if (!value.is<const char *>()) {
+    return false;
+  }
+  const char *name = value;
+  for (uint8_t i = 0; i < count; i++) {
+    if (strcmp(name, names[i]) == 0) {
+      out = i;
       return true;
     }
   }
@@ -68,12 +88,13 @@ bool Protocol::decode(const uint8_t *buf, size_t len, Command &out) {
     out.wl = obj["wl"];
     out.wr = obj["wr"];
   } else if (strcmp(type, "mode") == 0) {
-    if (!obj["mode"].is<const char *>() ||
-        !parseModeName(obj["mode"], out.mode)) {
+    uint8_t mode;
+    if (!parseName(obj["mode"], kModeNames, COUNT_OF(kModeNames), mode)) {
       error_ = "bad_mode";
       return false;
     }
     out.type = MsgType::Mode;
+    out.mode = (RobotMode)mode;
     out.params.distance = obj["distance"] | NAN;
     out.params.vMax = obj["v_max"] | NAN;
     out.params.aMax = obj["a_max"] | NAN;
@@ -83,6 +104,23 @@ bool Protocol::decode(const uint8_t *buf, size_t len, Command &out) {
     out.params.maxSearch = obj["max_search"] | NAN;
     out.params.vSearch = obj["v_search"] | NAN;
     out.params.grabDistance = obj["grab_distance"] | NAN;
+  } else if (strcmp(type, "gripper") == 0) {
+    // Each field is optional (missing = leave that servo as is), but a present
+    // one must be a known state, and at least one must be present.
+    uint8_t lift = 0, grip = 0;
+    out.hasLift = !obj["lift"].isNull();
+    out.hasGrip = !obj["grip"].isNull();
+    if ((!out.hasLift && !out.hasGrip) ||
+        (out.hasLift &&
+         !parseName(obj["lift"], kLiftNames, COUNT_OF(kLiftNames), lift)) ||
+        (out.hasGrip &&
+         !parseName(obj["grip"], kGripNames, COUNT_OF(kGripNames), grip))) {
+      error_ = "bad_gripper";
+      return false;
+    }
+    out.type = MsgType::Gripper;
+    out.lift = (LiftState)lift;
+    out.grip = (GripState)grip;
   } else if (strcmp(type, "heartbeat") == 0) {
     out.type = MsgType::Heartbeat;
   } else if (strcmp(type, "ping") == 0) {
@@ -129,9 +167,22 @@ size_t Protocol::encodeStatus(const Status &status, uint32_t seq, uint32_t t,
   doc_["result"] = PROTOCOL_pcResultName(status.result);
   doc_["reason"] = status.reason;
   doc_["cmd_seq"] = status.cmdSeq;
+  doc_["lift"] = PROTOCOL_pcLiftName(status.lift);
+  doc_["grip"] = PROTOCOL_pcGripName(status.grip);
   doc_["watchdog"] = status.watchdog;
   doc_["rx_ok"] = status.rxOk;
   doc_["rx_bad"] = status.rxBad;
+  return finish(buf, cap);
+}
+
+size_t Protocol::encodeSensors(const Sensors &sensors, uint32_t seq,
+                               uint32_t t, uint8_t *buf, size_t cap) {
+  begin("sensors", seq, t);
+  if (isnan(sensors.rangeM)) {
+    doc_["range_m"] = nullptr; // no reading
+  } else {
+    doc_["range_m"] = sensors.rangeM;
+  }
   return finish(buf, cap);
 }
 

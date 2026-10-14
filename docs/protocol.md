@@ -13,7 +13,7 @@ How the laptop talks to the robot. If you use `tools/robot_link.py`, it handles 
 
 The robot replies to whichever address sent it the last valid packet, so **the laptop always talks first**.
 
-UDP can lose packets. Anything that must arrive (mode changes) is acknowledged and retried. Everything else is streamed, so a lost packet is replaced by the next one.
+UDP can lose packets. Anything that must arrive (mode and gripper commands) is acknowledged and retried. Everything else is streamed, so a lost packet is replaced by the next one.
 
 ## Common fields
 
@@ -32,6 +32,7 @@ Every message, in both directions, has:
 | `mode` | `mode`, plus that mode's parameters ([Modes](#modes)) | on change; the robot replies `ack` |
 | `twist` | `v` (m/s), `omega` (rad/s, + = counter-clockwise) | 50 Hz while in TWIST |
 | `wheel_vel` | `wl`, `wr` (rad/s) | 50 Hz while in WHEEL_VEL *(not implemented yet)* |
+| `gripper` | `lift` (`"UP"`/`"DOWN"`), `grip` (`"OPEN"`/`"CLOSED"`); each optional, at least one | on change; the robot replies `ack` ([Gripper](#gripper)) |
 | `heartbeat` | — | 50 Hz whenever no stream above is being sent |
 | `ping` | — | any time; the robot replies `pong` |
 
@@ -39,6 +40,7 @@ Examples:
 ```json
 {"type":"mode","seq":101,"t":5230,"mode":"MOVE","distance":0.5,"v_max":0.3}
 {"type":"twist","seq":102,"t":5250,"v":0.2,"omega":0.0}
+{"type":"gripper","seq":104,"t":5290,"lift":"DOWN","grip":"CLOSED"}
 {"type":"heartbeat","seq":103,"t":5270}
 ```
 
@@ -47,11 +49,12 @@ Examples:
 | `type` | Fields | Rate |
 |---|---|---|
 | `odometry` | `x`, `y` (m), `theta` (rad), `v` (m/s), `omega` (rad/s) | 20 Hz |
-| `status` | `mode`, `phase`, `result`, `reason`, `cmd_seq`, `watchdog`, `rx_ok`, `rx_bad` | 5 Hz, plus immediately on any change |
-| `ack` | `ack_seq`, `ok`, `err` | reply to each `mode` |
+| `sensors` | `range_m` (ultrasonic range in m, or `null` when there's no reading) | 10 Hz |
+| `status` | `mode`, `phase`, `result`, `reason`, `cmd_seq`, `lift`, `grip`, `watchdog`, `rx_ok`, `rx_bad` | 5 Hz, plus immediately on any change |
+| `ack` | `ack_seq`, `ok`, `err` | reply to each `mode` and `gripper` |
 | `pong` | `ping_t` (the `t` of the ping) | reply to each `ping` |
 
-`odometry` is all zeros until the encoders are integrated.
+`odometry` is all zeros until the encoders are integrated, and `sensors.range_m` is always `null` until the ultrasonic driver exists.
 
 `status` fields:
 
@@ -62,6 +65,7 @@ Examples:
 | `result` | `RUNNING`, `DONE`, `FAILED` or `PREEMPTED` |
 | `reason` | why it failed, e.g. `watchdog`, `timeout`, `stall`; empty otherwise |
 | `cmd_seq` | `seq` of the `mode` command this result belongs to, so you can tell which command finished |
+| `lift`, `grip` | the gripper's current commanded state (`UP`/`DOWN`, `OPEN`/`CLOSED`) |
 | `watchdog` | `true` while no valid packet has arrived for 300 ms |
 | `rx_ok`, `rx_bad` | packets accepted / rejected since boot |
 
@@ -69,7 +73,7 @@ Examples:
 
 Examples:
 ```json
-{"type":"status","seq":88,"t":91200,"mode":"TWIST","phase":"DRIVING","result":"RUNNING","reason":"","cmd_seq":101,"watchdog":false,"rx_ok":412,"rx_bad":0}
+{"type":"status","seq":88,"t":91200,"mode":"TWIST","phase":"DRIVING","result":"RUNNING","reason":"","cmd_seq":101,"lift":"UP","grip":"OPEN","watchdog":false,"rx_ok":412,"rx_bad":0}
 {"type":"ack","seq":89,"t":91210,"ack_seq":101,"ok":true,"err":""}
 ```
 
@@ -77,15 +81,16 @@ Examples:
 
 - **Validation.** The robot rejects a packet that isn't a JSON object, has an unknown `type`, is missing a required field, or has a wrong field type. A rejected packet counts in `rx_bad` and is otherwise ignored, with no reply.
 - **Sequence numbers.** The robot drops a packet whose `seq` is not higher than the last one it accepted. Once the watchdog has tripped, any `seq` is accepted, so a restarted script can reconnect. RobotLink starts `seq` from the wall clock, so restarts are accepted right away.
-- **Watchdog.** Any valid packet keeps the link alive. After **300 ms** with no valid packet, the robot switches to STOP and reports `result: FAILED, reason: watchdog`. It stays in STOP until it receives a new `mode` command.
+- **Watchdog.** Any valid packet keeps the link alive. After **300 ms** with no valid packet, the robot switches to STOP and reports `result: FAILED, reason: watchdog`. It stays in STOP until it receives a new `mode` command. The gripper is **not** affected: it holds its state.
 - **Stream staleness.** In TWIST, if no `twist` arrives for 300 ms, the robot sets v and ω to 0 (`phase: NO_INPUT`), even if heartbeats keep the link alive.
 - **Preemption.** A new `mode` command replaces the current one immediately. The old command reports `PREEMPTED` with its own `cmd_seq`.
-- **Repeats.** Sending the mode the robot is already running (e.g. a retry after a lost ack) is acknowledged and only updates `cmd_seq`.
+- **Repeats.** Sending the mode the robot is already running (e.g. a retry after a lost ack) is acknowledged and changes nothing: `cmd_seq` stays that of the command that started the mode, so the mode isn't restarted.
+- **End of a mode.** When a mode reports DONE or FAILED, the robot returns to STOP, keeping that command's `cmd_seq`, `result` and `reason` in the status.
 - **On entering any mode,** the robot resets its controllers and takes its current position and heading as the starting point.
 
 ## Modes
 
-Only **STOP** and **TWIST** are implemented right now. The other modes are acknowledged with `ok: false, err: "not_implemented"` until they're built. Parameters marked `?` are optional.
+Only **STOP** and **TWIST** are implemented right now. **SQUARE** is accepted (`ok: true`), but immediately reports `FAILED`, reason `not_implemented`, and returns to STOP, because its control code is a stub. The other modes are acknowledged with `ok: false, err: "not_implemented"` until they're built. Parameters marked `?` are optional.
 
 ### STOP
 The safe resting state. The robot boots into STOP, and returns to it after DONE, FAILED or a watchdog trip.
@@ -124,7 +129,7 @@ Rotate in place.
 - **DONE:** within 1° of the target and stopped.
 - **FAILED:** `timeout`, `stall`.
 
-### SQUARE *(not implemented)*
+### SQUARE *(accepted; stub reports `not_implemented`)*
 Drive slowly forward to a line on the floor and align square to it, using the two IR line sensors on the front corners. This also re-references the robot's heading.
 - **Parameters:** `max_search` (m), `v_search?` (m/s).
 - **Phases:**
@@ -148,13 +153,26 @@ Close in on a box to grabbing distance, using the ultrasonic sensor.
   - `max_travel`: drove too far without arriving;
   - `timeout`.
 
+## Gripper
+
+Two servos, commanded independently of the drive mode with a `gripper` message:
+- **`lift`:** `UP` or `DOWN` (the angle servo).
+- **`grip`:** `OPEN` or `CLOSED` (the state servo).
+
+Rules:
+- **Each field is optional.** Leave one out to keep that servo where it is. A message with neither, or with an unknown state, is rejected (`bad_gripper`, no ack).
+- **It works in any mode**, including while driving in TWIST, and never changes the drive mode.
+- **It holds through mode changes and watchdog trips,** so a WiFi blip doesn't drop a box.
+- **At boot** the robot assumes `UP` / `OPEN`.
+- **Current status: mock.** The robot acks, logs and reports the state, but the servos aren't driven yet. The robot maps each state to a servo angle itself, so laptop code never deals with angles.
+
 ## Using RobotLink
 
 `tools/robot_link.py` needs Python 3.10+. It:
 - sends heartbeats or your twist at 50 Hz in the background;
 - fills in `seq` and `t`;
-- retries mode commands until they're acknowledged;
-- keeps the latest odometry and status for you.
+- retries mode and gripper commands until they're acknowledged;
+- keeps the latest odometry, sensors and status for you.
 
 ```python
 import time
@@ -167,6 +185,9 @@ with RobotLink() as robot:
     print(robot.latest_odometry())         # dict, or None if none received yet
     print(robot.latest_status())
     print(robot.ping(), "ms")
+
+    ok, err = robot.set_gripper(lift="DOWN", grip="CLOSED")  # works in any mode
+    print(robot.latest_sensors())          # {"range_m": None, ...} until the ultrasonic driver exists
 
     ok, err = robot.set_mode("MOVE", distance=0.5)   # currently (False, "not_implemented")
     robot.set_mode("STOP")
