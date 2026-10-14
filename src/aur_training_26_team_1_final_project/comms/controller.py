@@ -78,6 +78,10 @@ class MyController(QObject):
             for i in range(self._controller.get_numbuttons()):
                 inputs.append(self._controller.get_button(i))
 
+            # Fix triggers range
+            inputs[4] = (inputs[4]+1.0)/2.0
+            inputs[5] = (inputs[5]+1.0)/2.0
+
             # For debugging
             print(inputs)
 
