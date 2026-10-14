@@ -7,7 +7,15 @@
 #include <stdint.h>
 
 /* Laptop -> robot message types */
-enum class MsgType : uint8_t { Mode, Twist, WheelVel, Gripper, Heartbeat, Ping };
+enum class MsgType : uint8_t {
+  Mode,
+  Twist,
+  WheelVel,
+  Gripper,
+  SquareRef,
+  Heartbeat,
+  Ping
+};
 
 /* Robot behaviors, selected by a `mode` message */
 enum class RobotMode : uint8_t {
@@ -27,7 +35,10 @@ enum class Result : uint8_t { Running, Done, Failed, Preempted };
 enum class LiftState : uint8_t { Up, Down };
 enum class GripState : uint8_t { Open, Closed };
 
-/* Optional `mode` parameters. Absent ones are NAN. */
+/* Arena boundary edges, used by `square_ref` and TURN `facing` */
+enum class Side : uint8_t { North, East, South, West };
+
+/* Optional `mode` parameters. Absent numbers are NAN. */
 struct ModeParams {
   float distance;     // MOVE (m)
   float vMax;         // MOVE, APPROACH (m/s)
@@ -38,6 +49,8 @@ struct ModeParams {
   float maxSearch;    // SQUARE (m)
   float vSearch;      // SQUARE (m/s)
   float grabDistance; // APPROACH (m)
+  bool hasFacing;     // TURN: facing was given
+  Side facing;        // TURN, absolute: face this arena side
 };
 
 /* A decoded laptop -> robot message. Only the fields for `type` are set. */
@@ -55,6 +68,7 @@ struct Command {
   LiftState lift;    // Gripper
   bool hasGrip;      // Gripper: grip was given
   GripState grip;    // Gripper
+  Side side;         // SquareRef: the edge the robot just squared on
 };
 
 struct Odometry {
@@ -86,6 +100,7 @@ const char *PROTOCOL_pcModeName(RobotMode mode);
 const char *PROTOCOL_pcResultName(Result result);
 const char *PROTOCOL_pcLiftName(LiftState lift);
 const char *PROTOCOL_pcGripName(GripState grip);
+const char *PROTOCOL_pcSideName(Side side);
 
 /*
  * JSON encode/decode for schema v1. No WiFi or clock dependency: callers

@@ -19,6 +19,12 @@ Example:
         print(robot.latest_odometry())
         robot.set_gripper(lift="DOWN", grip="CLOSED")   # works in any mode
         print(robot.latest_sensors())          # e.g. {"range_m": None, ...}
+
+        # Localize: square on an arena edge, then say which edge it was
+        robot.set_mode("SQUARE", max_search=0.5)
+        # ...wait until latest_status()["phase"] == "WAITING", then:
+        robot.set_square_side("SOUTH")         # fixes theta and y in odometry
+        robot.set_mode("TURN", facing="WEST")  # face an arena side
         robot.set_mode("STOP")
 
 Safety: if the robot hears nothing valid for 300 ms (e.g. this script
@@ -39,6 +45,7 @@ MAX_PAYLOAD = 1472
 MODES = ("STOP", "WHEEL_VEL", "TWIST", "MOVE", "TURN", "SQUARE", "APPROACH")
 LIFT_STATES = ("UP", "DOWN")
 GRIP_STATES = ("OPEN", "CLOSED")
+SIDES = ("NORTH", "EAST", "SOUTH", "WEST")  # arena edges (docs/protocol.md)
 
 
 class RobotLink:
@@ -113,13 +120,16 @@ class RobotLink:
             mode: One of MODES.
             retries: How many times to send before giving up.
             timeout: Seconds to wait for each acknowledgement.
-            **params: Mode parameters, e.g. distance=0.5 for MOVE (see docs/protocol.md).
+            **params: Mode parameters, e.g. distance=0.5 for MOVE, or
+                facing="NORTH" for TURN (see docs/protocol.md).
         Returns:
             (ok, err): ok is False if the robot refused (err says why, e.g.
             "not_implemented") or never answered (err == "timeout").
         """
         if mode not in MODES:
             raise ValueError(f"unknown mode {mode!r}; expected one of {MODES}")
+        if "facing" in params and params["facing"] not in SIDES:
+            raise ValueError(f"unknown facing {params['facing']!r}; expected one of {SIDES}")
         with self._lock:
             self._streaming_twist = False  # don't send twists into a different mode
         ok, err = self._send_acked({"type": "mode", "mode": mode, **params}, retries, timeout)
@@ -156,6 +166,24 @@ class RobotLink:
         if grip is not None:
             msg["grip"] = grip
         return self._send_acked(msg, retries, timeout)
+
+    def set_square_side(self, side: str, retries: int = 3, timeout: float = 0.3) -> tuple[bool, str]:
+        """Tell the robot which arena edge it just squared on.
+
+        Only accepted while SQUARE is waiting for it (status phase "WAITING");
+        otherwise the robot answers (False, "not_waiting"). On success the robot
+        corrects theta and one coordinate, and SQUARE ends with DONE. If an ack
+        is lost the retry is answered "not_waiting", so check latest_status()
+        for result DONE rather than relying on ok alone.
+
+        Args:
+            side: One of SIDES: the edge the robot is facing.
+        Returns:
+            (ok, err), as for set_mode().
+        """
+        if side not in SIDES:
+            raise ValueError(f"unknown side {side!r}; expected one of {SIDES}")
+        return self._send_acked({"type": "square_ref", "side": side}, retries, timeout)
 
     def set_twist(self, v: float, omega: float) -> None:
         """Set the velocity streamed while in TWIST mode.

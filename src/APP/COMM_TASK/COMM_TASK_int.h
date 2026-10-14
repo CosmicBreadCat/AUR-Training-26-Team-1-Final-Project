@@ -13,6 +13,8 @@ typedef struct {
   float omega;       // rad/s, 0 when the twist input is stale
   ModeParams params; // the mode command's parameters (NAN = not given)
   uint32_t cmdSeq;   // seq of the mode command that set `mode`
+  bool hasSquareRef; // SQUARE: the driver named the edge (square_ref)
+  Side squareRef;    // SQUARE: that edge
 } MotionCommand_t;
 
 /* Where the gripper should be. Independent of the drive mode. */

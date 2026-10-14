@@ -16,6 +16,8 @@ typedef struct {
   float omega;
   bool haveTwist;
   uint32_t lastTwistMs;
+  bool hasSquareRef;
+  Side squareRef;
 } RobotState_t;
 
 /* Owned by the comms task only */
@@ -54,15 +56,16 @@ static ModeParams xNoParams(void) {
   return xParams;
 }
 
-/* Modes the firmware accepts. The rest are acked "not_implemented". */
-static bool bModeSupported(RobotMode Copy_xMode) {
-  return Copy_xMode == RobotMode::Stop || Copy_xMode == RobotMode::Twist ||
+/* Modes whose phase and result come from the control task */
+static bool bControlOwned(RobotMode Copy_xMode) {
+  return Copy_xMode == RobotMode::Move || Copy_xMode == RobotMode::Turn ||
          Copy_xMode == RobotMode::Square;
 }
 
-/* Modes whose phase and result come from the control task */
-static bool bControlOwned(RobotMode Copy_xMode) {
-  return Copy_xMode == RobotMode::Square;
+/* Modes the firmware accepts. The rest are acked "not_implemented". */
+static bool bModeSupported(RobotMode Copy_xMode) {
+  return Copy_xMode == RobotMode::Stop || Copy_xMode == RobotMode::Twist ||
+         bControlOwned(Copy_xMode);
 }
 
 static Status xCurrentStatus(void) {
@@ -106,6 +109,7 @@ static void vEndInStop(Result Copy_xResult, const char *Copy_pcReason) {
   xState.params = xNoParams();
   xState.v = 0.0f;
   xState.omega = 0.0f;
+  xState.hasSquareRef = false;
 }
 
 static void vEnterMode(RobotMode Copy_xMode, const ModeParams *Copy_pxParams,
@@ -130,6 +134,7 @@ static void vEnterMode(RobotMode Copy_xMode, const ModeParams *Copy_pxParams,
   xState.v = 0.0f;
   xState.omega = 0.0f;
   xState.haveTwist = false;
+  xState.hasSquareRef = false;
   Serial.printf("mode -> %s (cmd %u)\n", PROTOCOL_pcModeName(Copy_xMode),
                 Copy_u32CmdSeq);
 }
@@ -174,6 +179,23 @@ static void vHandleGripper(const Command *Copy_pxCmd) {
                 PROTOCOL_pcGripName(xGripper.grip), xGripper.cmdSeq);
 }
 
+/* The driver names the edge SQUARE just aligned to. Only accepted while
+ * SQUARE is waiting for it; the control task then corrects the pose. */
+static void vHandleSquareRef(const Command *Copy_pxCmd) {
+  if (xState.mode != RobotMode::Square || xState.result != Result::Running ||
+      strcmp(xState.phase, "WAITING") != 0) {
+    xComms.sendAck(Copy_pxCmd->seq, false, "not_waiting");
+    Serial.printf("square_ref %s rejected: not waiting\n",
+                  PROTOCOL_pcSideName(Copy_pxCmd->side));
+    return;
+  }
+  xState.hasSquareRef = true;
+  xState.squareRef = Copy_pxCmd->side;
+  xComms.sendAck(Copy_pxCmd->seq, true, "");
+  Serial.printf("square_ref -> %s (cmd %u)\n",
+                PROTOCOL_pcSideName(Copy_pxCmd->side), Copy_pxCmd->seq);
+}
+
 /* Adopts the control task's progress for the mode it is running */
 static void vApplyMotionResult(void) {
   MotionResult_t xResult;
@@ -211,6 +233,9 @@ static void vStep(void) {
       break;
     case MsgType::Gripper:
       vHandleGripper(&xCmd);
+      break;
+    case MsgType::SquareRef:
+      vHandleSquareRef(&xCmd);
       break;
     default:
       break; // wheel_vel: WHEEL_VEL is not implemented yet
@@ -255,8 +280,10 @@ static void vStep(void) {
     }
   }
 
-  MotionCommand_t xMotion = {xState.mode, xState.v, xState.omega,
-                             xState.params, xState.cmdSeq};
+  MotionCommand_t xMotion = {xState.mode,        xState.v,
+                             xState.omega,       xState.params,
+                             xState.cmdSeq,      xState.hasSquareRef,
+                             xState.squareRef};
   xQueueOverwrite(xMotionMailbox, &xMotion);
 
   if (u32Now - u32LastOdometryMs >= COMM_ODOMETRY_PERIOD_MS) {
@@ -268,7 +295,8 @@ static void vStep(void) {
 
   if (u32Now - u32LastSensorsMs >= COMM_SENSORS_PERIOD_MS) {
     Sensors xSensors = {NAN};
-    xQueuePeek(xSensorsMailbox, &xSensors, 0); // stays NAN until someone sets it
+    xQueuePeek(xSensorsMailbox, &xSensors,
+               0); // stays NAN until someone sets it
     xComms.sendSensors(xSensors);
     u32LastSensorsMs = u32Now;
   }

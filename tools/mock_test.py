@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
-"""Exercise the mocked features: gripper commands, the SQUARE stub and sensors.
+"""Exercise the mocked features: gripper, localization by squaring, MOVE/TURN stubs, sensors.
 
 Steps:
   1. Local validation: bad gripper arguments raise ValueError without sending.
   2. Gripper in STOP, then in TWIST: each command is acked, status shows the
      new lift/grip, and the drive mode is unchanged.
-  3. SQUARE: acked, then the control-task stub reports FAILED/not_implemented
+  3. Localization: square_ref is refused unless SQUARE is WAITING; SQUARE
+     (mocked) goes straight to WAITING; square_ref SOUTH then WEST corrects
+     theta/y then theta/x in odometry and ends SQUARE with DONE.
+  4. MOVE, TURN: acked, then the control-task stub reports FAILED
+     (not_implemented, missing_distance / missing_angle, conflicting_target)
      and the robot returns to STOP.
-  4. sensors: ~10 Hz, range_m None (no ultrasonic driver yet).
+  5. sensors: ~10 Hz, range_m None (no ultrasonic driver yet).
+
+TURN facing before any square_ref since boot fails with no_heading_ref; that
+only reproduces right after a reboot, so it isn't checked here.
 """
+import math
 import time
 
 from robot_link import RobotLink
 
 failures = 0
+
+# Mirror the placeholders in src/APP/CONTROL_TASK/CONTROL_TASK_cfg.h
+ARENA_SIZE_M = 2.0
+IR_FORWARD_OFFSET_M = 0.10
 
 
 def check(cond, what):
@@ -66,16 +78,58 @@ def main():
         check(robot.set_mode("TWIST")[0], "set_mode TWIST")
         gripper_round(robot, "TWIST")
 
-        print("\n[3] SQUARE stub")
-        ok, err = robot.set_mode("SQUARE", max_search=1.0)
-        check(ok, f"set_mode SQUARE acked {(ok, err)}")
-        took = wait_for(lambda: (s := robot.latest_status()) is not None
-                        and s["mode"] == "STOP" and s["result"] == "FAILED", 1.0)
-        s = robot.latest_status() or {}
-        check(took is not None and s.get("reason") == "not_implemented",
-              f"status mode={s.get('mode')} result={s.get('result')}/{s.get('reason')}")
+        print("\n[3] localization by squaring")
+        try:
+            robot.set_square_side("UP")
+            check(False, "set_square_side('UP') should raise")
+        except ValueError:
+            check(True, "set_square_side('UP') raises ValueError")
+        check(robot.set_square_side("NORTH") == (False, "not_waiting"),
+              "square_ref in STOP -> (False, 'not_waiting')")
+        d = IR_FORWARD_OFFSET_M
+        for side, want in (("SOUTH", {"theta": -math.pi / 2, "y": d}),
+                           ("WEST", {"theta": math.pi, "x": d, "y": d})):
+            ok, err = robot.set_mode("SQUARE", max_search=0.5)
+            check(ok, f"set_mode SQUARE acked {(ok, err)}")
+            took = wait_for(lambda: (s := robot.latest_status()) is not None
+                            and s["mode"] == "SQUARE" and s["phase"] == "WAITING", 1.0)
+            check(took is not None, "SQUARE reaches phase WAITING")
+            prev_seq = (robot.latest_status() or {}).get("cmd_seq")
+            ok, err = robot.set_square_side(side)
+            check(ok, f"set_square_side({side}) acked {(ok, err)}")
+            took = wait_for(lambda: (s := robot.latest_status()) is not None
+                            and s["mode"] == "STOP" and s["result"] == "DONE"
+                            and s["cmd_seq"] == prev_seq, 1.0)
+            check(took is not None, "SQUARE ends DONE -> STOP")
+            close = lambda o: o is not None and all(abs(o[k] - v) < 1e-3 for k, v in want.items())
+            wait_for(lambda: close(robot.latest_odometry()), 0.5)
+            o = robot.latest_odometry() or {}
+            nan = float("nan")
+            check(close(o), f"odometry after {side}: x={o.get('x', nan):.3f} y={o.get('y', nan):.3f} "
+                            f"theta={o.get('theta', nan):.3f} (expect {want})")
 
-        print("\n[4] sensors stream (2 s)")
+        print("\n[4] MOVE / TURN stubs")
+        cases = (
+            ("MOVE", {"distance": 0.5}, "not_implemented"),
+            ("MOVE", {}, "missing_distance"),
+            ("TURN", {"angle": 1.57}, "not_implemented"),
+            ("TURN", {"facing": "NORTH"}, "not_implemented"),  # heading known after [3]
+            ("TURN", {"angle": 1.57, "facing": "NORTH"}, "conflicting_target"),
+            ("TURN", {}, "missing_angle"),
+        )
+        for mode, params, reason in cases:
+            prev_seq = (robot.latest_status() or {}).get("cmd_seq")
+            ok, err = robot.set_mode(mode, **params)
+            check(ok, f"set_mode {mode} {params} acked {(ok, err)}")
+            took = wait_for(lambda: (s := robot.latest_status()) is not None
+                            and s["cmd_seq"] != prev_seq and s["mode"] == "STOP"
+                            and s["result"] == "FAILED", 1.0)
+            s = robot.latest_status() or {}
+            check(took is not None and s.get("reason") == reason,
+                  f"{mode} {params} -> mode={s.get('mode')} {s.get('result')}/{s.get('reason')} "
+                  f"(expect STOP FAILED/{reason})")
+
+        print("\n[5] sensors stream (2 s)")
         count, last_t = 0, None
         end = time.monotonic() + 2.0
         while time.monotonic() < end:

@@ -11,6 +11,7 @@ static const char *const kResultNames[] = {"RUNNING", "DONE", "FAILED",
 /* Each table must list names in the same order as its enum */
 static const char *const kLiftNames[] = {"UP", "DOWN"};
 static const char *const kGripNames[] = {"OPEN", "CLOSED"};
+static const char *const kSideNames[] = {"NORTH", "EAST", "SOUTH", "WEST"};
 
 #define COUNT_OF(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -28,6 +29,10 @@ const char *PROTOCOL_pcLiftName(LiftState lift) {
 
 const char *PROTOCOL_pcGripName(GripState grip) {
   return kGripNames[(uint8_t)grip];
+}
+
+const char *PROTOCOL_pcSideName(Side side) {
+  return kSideNames[(uint8_t)side];
 }
 
 /* Finds name in a table; out is its index, i.e. the enum value */
@@ -104,6 +109,15 @@ bool Protocol::decode(const uint8_t *buf, size_t len, Command &out) {
     out.params.maxSearch = obj["max_search"] | NAN;
     out.params.vSearch = obj["v_search"] | NAN;
     out.params.grabDistance = obj["grab_distance"] | NAN;
+    out.params.hasFacing = !obj["facing"].isNull();
+    if (out.params.hasFacing) {
+      uint8_t facing;
+      if (!parseName(obj["facing"], kSideNames, COUNT_OF(kSideNames), facing)) {
+        error_ = "bad_mode";
+        return false;
+      }
+      out.params.facing = (Side)facing;
+    }
   } else if (strcmp(type, "gripper") == 0) {
     // Each field is optional (missing = leave that servo as is), but a present
     // one must be a known state, and at least one must be present.
@@ -121,6 +135,14 @@ bool Protocol::decode(const uint8_t *buf, size_t len, Command &out) {
     out.type = MsgType::Gripper;
     out.lift = (LiftState)lift;
     out.grip = (GripState)grip;
+  } else if (strcmp(type, "square_ref") == 0) {
+    uint8_t side;
+    if (!parseName(obj["side"], kSideNames, COUNT_OF(kSideNames), side)) {
+      error_ = "bad_square_ref";
+      return false;
+    }
+    out.type = MsgType::SquareRef;
+    out.side = (Side)side;
   } else if (strcmp(type, "heartbeat") == 0) {
     out.type = MsgType::Heartbeat;
   } else if (strcmp(type, "ping") == 0) {
