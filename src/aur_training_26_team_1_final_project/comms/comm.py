@@ -28,7 +28,7 @@ class MyCommunicationChannel(QObject):
         # Statistics & timing
         self._odom_count = 0
         self._status_count = 0
-        self._last_odom_t = None
+        self._last_odom = None
         self._last_status_t = None
         self._next_print = 0.0
         self._next_toggle = 0.0
@@ -80,7 +80,7 @@ class MyCommunicationChannel(QObject):
             # Reset stats & timers
             self._odom_count = 0
             self._status_count = 0
-            self._last_odom_t = None
+            self._last_odom = None
             self._last_status_t = None
             self._start_time = time.monotonic()
             self._next_print = self._start_time
@@ -129,8 +129,8 @@ class MyCommunicationChannel(QObject):
             if self._data[7] == 1 and now >= self._next_toggle:
                 self._next_toggle = now + 0.5
                 # Save Location
-                if self._last_odom_t:
-                    self.qr_box_dropped.emit((self._last_odom_t["x"], self._last_odom_t["y"]))
+                if self._last_odom:
+                    self.qr_box_dropped.emit((self._last_odom["x"], self._last_odom["y"]))
 
             if self._mode == "TWIST":
                 vel, omega = self._get_vel_resultant(self._data[0], self._data[1])
@@ -138,9 +138,9 @@ class MyCommunicationChannel(QObject):
 
         # 2. Poll odometry
         o = self.robot.latest_odometry()
-        if o and o.get("t") != self._last_odom_t:
+        if o:
             self._odom_count += 1
-            self._last_odom_t = o["t"]
+            self._last_odom = o
             self.updated_odometry_data.emit(o)
 
         # 3. Poll status
