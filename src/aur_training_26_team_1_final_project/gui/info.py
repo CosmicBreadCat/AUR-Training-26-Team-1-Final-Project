@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtCore import Qt, Signal, QObject, QTimer
+from aur_training_26_team_1_final_project.gui.data import MyData
 
 class MyInfo(QWidget):
 
@@ -27,7 +28,7 @@ class MyInfo(QWidget):
         self._qr_boxes_dropped_label = QLabel('QR Dropped Boxes: \n')
         self._qr_boxes_detected_label = QLabel('QR Detected Boxes: \n')
 
-        self._data = QObject()
+        self._data = MyData(self)
         self._data.linear_speed = 0
         self._data.angular_speed = 0
         self._data.coord = (0, 0)
@@ -55,6 +56,7 @@ class MyInfo(QWidget):
         self._timer = QTimer()
         self._timer.setInterval(20)
         self._timer.timeout.connect(self._update_widgets)
+        self._timer.start()
 
     def update_data(self, new_data:dict):
         if not new_data:
@@ -87,4 +89,3 @@ class MyInfo(QWidget):
             text += f"{coord}\n"
             
         self._qr_boxes_detected_label.setText(text)
-            
