@@ -14,7 +14,7 @@
  *
  * PLACEHOLDER VALUES: measure the real ones and replace.
  */
-#define CONTROLTASK_ARENA_SIZE_M 2.0f         // side length of the square arena
+#define CONTROLTASK_ARENA_SIZE_M 3.0f         // side length of the square arena
 #define CONTROLTASK_IR_FORWARD_OFFSET_M 0.10f // IR sensor line ahead of center
 
 /* Rough start pose in the bottom-left corner, used until squaring fixes it */

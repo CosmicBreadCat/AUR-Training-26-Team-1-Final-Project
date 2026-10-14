@@ -1,4 +1,4 @@
-# Robot ↔ Laptop Protocol (v1)
+# RobotLink Protocol (v1.2)
 
 How the laptop talks to the robot. If you use `tools/robot_link.py`, it handles most of this for you (see [Using RobotLink](#using-robotlink)). Read this to understand what the robot does with your commands and what it reports back.
 
@@ -42,9 +42,9 @@ Examples:
 ```json
 {"type":"mode","seq":101,"t":5230,"mode":"MOVE","distance":0.5,"v_max":0.3}
 {"type":"twist","seq":102,"t":5250,"v":0.2,"omega":0.0}
+{"type":"heartbeat","seq":103,"t":5270}
 {"type":"gripper","seq":104,"t":5290,"lift":"DOWN","grip":"CLOSED"}
 {"type":"square_ref","seq":105,"t":5310,"side":"SOUTH"}
-{"type":"heartbeat","seq":103,"t":5270}
 ```
 
 ## Robot → laptop
@@ -54,7 +54,7 @@ Examples:
 | `odometry` | `x`, `y` (m), `theta` (rad), `v` (m/s), `omega` (rad/s) | 20 Hz |
 | `sensors` | `range_m` (ultrasonic range in m, or `null` when there's no reading), `ir_left`, `ir_right` (`true` = that front-corner IR sees the boundary line; `null` until the IR sensors are read) | 10 Hz |
 | `status` | `mode`, `phase`, `result`, `reason`, `cmd_seq`, `lift`, `grip`, `watchdog`, `rx_ok`, `rx_bad` | 5 Hz, plus immediately on any change |
-| `ack` | `ack_seq`, `ok`, `err` | reply to each `mode` and `gripper` |
+| `ack` | `ack_seq`, `ok`, `err` | reply to each `mode`, `gripper` and `square_ref` |
 | `pong` | `ping_t` (the `t` of the ping) | reply to each `ping` |
 
 `odometry` is all zeros until the encoders are integrated. In `sensors`, `range_m` is always `null` until the ultrasonic driver exists, and `ir_left` / `ir_right` until the IR driver exists.
@@ -64,15 +64,15 @@ Examples:
 | Field | Meaning |
 |---|---|
 | `mode` | current mode |
-| `phase` | what the mode is doing right now, e.g. `IDLE`, `DRIVING`, `NO_INPUT`, `SEARCH` |
+| `phase` | what the mode is doing right now, e.g. `IDLE`, `DRIVING`, `NO_INPUT`, `STARTING`, `WAITING` |
 | `result` | `RUNNING`, `DONE`, `FAILED` or `PREEMPTED` |
-| `reason` | why it failed, e.g. `watchdog`, `timeout`, `stall`; empty otherwise |
+| `reason` | why it failed, e.g. `watchdog`, `not_implemented`, `missing_distance`; empty otherwise. Each mode lists its reasons below |
 | `cmd_seq` | `seq` of the `mode` command this result belongs to, so you can tell which command finished |
 | `lift`, `grip` | the gripper's current commanded state (`UP`/`DOWN`, `OPEN`/`CLOSED`) |
 | `watchdog` | `true` while no valid packet has arrived for 300 ms |
 | `rx_ok`, `rx_bad` | packets accepted / rejected since boot |
 
-`ack` fields: `ok` is `false` when the robot refused the command, and `err` says why (`not_implemented` for modes not built yet).
+`ack` fields: `ok` is `false` when the robot refused the command, and `err` says why: `not_implemented` for a mode that isn't built yet, `not_waiting` for a `square_ref` sent while SQUARE isn't in `WAITING`.
 
 Examples:
 ```json
@@ -129,7 +129,8 @@ Continuous driving from the laptop, e.g. a joystick or your own path controller.
 - **Parameters:** none. Then stream `twist` at 50 Hz.
 - **Behavior:**
   - follows `v` and `omega`, with acceleration limits;
-  - when `omega = 0`, holds the current heading using the gyro, so "straight" stays straight.
+  - when `omega = 0`, holds the current heading using the gyro, so "straight" stays straight;
+  - the [edge guard](#rules) stops a wheel driving forward over the boundary line.
 - **Phases:** `NO_INPUT` (no fresh twist; stopped), `DRIVING`.
 - **Ends:** never on its own.
 
@@ -144,9 +145,11 @@ Drive a set distance in a straight line.
 - **Behavior:** a smooth speed profile over the distance (measured by the wheel encoders), while holding the starting heading (gyro).
 - **DONE:** within 1 cm of the target and stopped.
 - **FAILED:**
+  - `missing_distance`: no `distance` given;
   - `timeout`: took more than twice the planned time;
   - `stall`: motors at full power but not moving;
-  - `obstacle`: the ultrasonic sensor saw something too close ahead.
+  - `obstacle`: the ultrasonic sensor saw something too close ahead;
+  - `not_implemented`: what the stub reports when `distance` is given.
 
 ### TURN *(accepted; stub reports `not_implemented`)*
 Rotate in place, either by an angle or to face an arena side.
@@ -165,7 +168,7 @@ Rotate in place, either by an angle or to face an arena side.
   - `not_implemented`: what the stub reports when the target is valid.
 
 ### SQUARE *(accepted; driving phases are a stub, goes straight to `WAITING`)*
-Drive slowly forward to an arena edge line and align square to it, using the two IR line sensors on the front corners. Then the driver says which edge it was, and the robot corrects its pose.
+Drive slowly forward to an arena edge line and align square to it, using the two IR line sensors on the front corners. Then the driver says which edge it was, and the robot corrects its pose. The edge guard is off in SQUARE, since it drives onto the line on purpose.
 - **Parameters:** `max_search` (m), `v_search?` (m/s).
 - **Phases:**
   1. `SEARCH`: driving forward.
@@ -217,7 +220,7 @@ Rules:
 `tools/robot_link.py` needs Python 3.10+. It:
 - sends heartbeats or your twist at 50 Hz in the background;
 - fills in `seq` and `t`;
-- retries mode and gripper commands until they're acknowledged;
+- retries mode, gripper and square_ref commands until they're acknowledged;
 - keeps the latest odometry, sensors and status for you.
 
 ```python
@@ -233,11 +236,11 @@ with RobotLink() as robot:
     print(robot.ping(), "ms")
 
     ok, err = robot.set_gripper(lift="DOWN", grip="CLOSED")  # works in any mode
-    print(robot.latest_sensors())          # {"range_m": None, ...} until the ultrasonic driver exists
+    print(robot.latest_sensors())          # range_m, ir_left, ir_right: None until the drivers exist
 
     # Localize: square on the SOUTH edge
     robot.set_mode("SQUARE", max_search=0.5)
-    while robot.latest_status()["phase"] != "WAITING":
+    while (robot.latest_status() or {}).get("phase") != "WAITING":
         time.sleep(0.01)
     robot.set_square_side("SOUTH")         # theta and y corrected in the next odometry
     robot.set_mode("TURN", facing="WEST")  # D-pad: face an arena side
