@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtCore import Qt, Signal, QObject, QTimer
+from PySide6.QtCore import QTimer
 from aur_training_26_team_1_final_project.gui.data import MyData
 
 class MyInfo(QWidget):

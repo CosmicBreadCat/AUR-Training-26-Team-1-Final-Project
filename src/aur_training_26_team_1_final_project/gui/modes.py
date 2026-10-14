@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit
 from PySide6.QtGui import QColor, QPalette, QIntValidator
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from functools import partial
 
 class MyModes(QWidget):

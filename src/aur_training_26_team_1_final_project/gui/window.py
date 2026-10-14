@@ -6,8 +6,6 @@ from aur_training_26_team_1_final_project.gui.status import MyStatus
 from aur_training_26_team_1_final_project.cv.camera import MyCamera
 from aur_training_26_team_1_final_project.comms.controller import MyController
 from aur_training_26_team_1_final_project.comms.comm import MyCommunicationChannel
-import threading
-
 
 class Window(QMainWindow):
     
@@ -43,16 +41,17 @@ class Window(QMainWindow):
         self.setCentralWidget(self._widget)
 
         self.show()
-        self.thread = QThread()
+        
+        self._thread = QThread()
         self._worker = MyCommunicationChannel()
-        self._worker.moveToThread(self.thread)
+        self._worker.moveToThread(self._thread)
 
-        self.thread.started.connect(self._worker.start_communication)
-        self._worker.finished.connect(self.thread.quit)
+        self._thread.started.connect(self._worker.start_communication)
+        self._worker.finished.connect(self._thread.quit)
         self._worker.finished.connect(self._worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
+        self._thread.finished.connect(self._thread.deleteLater)
 
-        self.thread.start()
+        self._thread.start()
 
         self._status.motion_started.connect(self._modes.motion_started)
         self._status.motion_stopped.connect(self._modes.motion_stopped)

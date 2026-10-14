@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from PySide6.QtCore import QObject, Property, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import QObject
+from PySide6.QtGui import QImage
 
 class MyDetector(QObject):
 
@@ -13,7 +13,7 @@ class MyDetector(QObject):
         
         self._qr_detector = cv2.QRCodeDetector()
 
-    def qimage_to_cv2(self, frame: QImage):
+    def _qimage_to_cv2(self, frame: QImage):
         frame = frame.convertToFormat(QImage.Format.Format_RGBA8888)
         
         width = frame.width()
@@ -27,7 +27,7 @@ class MyDetector(QObject):
         frame_bgr = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
         return frame_bgr
 
-    def cv2_to_qimage(self, frame):
+    def _cv2_to_qimage(self, frame):
         rgb_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width, _ = rgb_img.shape
         bytes_per_line = 3 * width
@@ -40,7 +40,7 @@ class MyDetector(QObject):
         )
         return q_img.copy()
 
-    def get_mask(self, idx, frame):
+    def _get_mask(self, idx, frame):
 
         if self._colors[idx*2] > self._colors[idx*2+1]:
 
@@ -56,7 +56,7 @@ class MyDetector(QObject):
         upper_mask = np.array([self._colors[idx*2+1], 255, 255])
         return cv2.inRange(frame, lower_mask, upper_mask)
 
-    def getQRCodeReader(self, frame):
+    def _getQRCodeReader(self, frame):
         decoded_texts = []
         decoded_data = []
     
@@ -76,7 +76,7 @@ class MyDetector(QObject):
 
     def get_data(self, qframe:QImage):
 
-        frame = self.qimage_to_cv2(qframe)
+        frame = self._qimage_to_cv2(qframe)
         
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
@@ -87,7 +87,7 @@ class MyDetector(QObject):
 
         for i in range(3):
             new_frame = frame.copy()
-            masks.append(self.get_mask(i, new_frame))
+            masks.append(self._get_mask(i, new_frame))
             masks[i] = cv2.morphologyEx(masks[i], cv2.MORPH_OPEN, kernel)
 
             contours, hierarchy = cv2.findContours(masks[i], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -115,7 +115,7 @@ class MyDetector(QObject):
 
         frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
 
-        decoded_data = self.getQRCodeReader(frame)
+        decoded_data = self._getQRCodeReader(frame)
 
         for data in decoded_data:
             points = data["points"]

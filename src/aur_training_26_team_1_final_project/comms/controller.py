@@ -1,7 +1,5 @@
-import sys
-import time
 import pygame
-from PySide6.QtCore import QObject, Property, Signal, QTimer
+from PySide6.QtCore import QObject, Signal, QTimer
 
 class MyController(QObject):
     controller_input_updated = Signal(list)
