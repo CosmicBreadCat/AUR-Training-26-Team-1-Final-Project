@@ -6,8 +6,8 @@ same router. RobotLink handles the protocol details for you:
   - keeps the link alive: a background thread sends 50 Hz heartbeats, or
     your latest twist while the robot is in TWIST mode;
   - fills in `seq` and `t` on every message;
-  - retries mode commands until the robot acknowledges them;
-  - keeps the newest odometry and status for you to read at any time.
+  - retries mode and gripper commands until the robot acknowledges them;
+  - keeps the newest odometry, sensors and status for you to read at any time.
 
 Example:
     from robot_link import RobotLink
@@ -17,6 +17,14 @@ Example:
         robot.set_twist(0.2, 0.0)          # m/s, rad/s; streamed until changed
         time.sleep(2)
         print(robot.latest_odometry())
+        robot.set_gripper(lift="DOWN", grip="CLOSED")   # works in any mode
+        print(robot.latest_sensors())          # e.g. {"range_m": None, ...}
+
+        # Localize: square on an arena edge, then say which edge it was
+        robot.set_mode("SQUARE", max_search=0.5)
+        # ...wait until latest_status()["phase"] == "WAITING", then:
+        robot.set_square_side("SOUTH")         # fixes theta and y in odometry
+        robot.set_mode("TURN", facing="WEST")  # face an arena side
         robot.set_mode("STOP")
 
 Safety: if the robot hears nothing valid for 300 ms (e.g. this script
@@ -35,6 +43,9 @@ DEFAULT_PORT = 5005
 MAX_PAYLOAD = 1472
 
 MODES = ("STOP", "WHEEL_VEL", "TWIST", "MOVE", "TURN", "SQUARE", "APPROACH")
+LIFT_STATES = ("UP", "DOWN")
+GRIP_STATES = ("OPEN", "CLOSED")
+SIDES = ("NORTH", "EAST", "SOUTH", "WEST")  # arena edges (docs/protocol.md)
 
 
 class RobotLink:
@@ -63,6 +74,7 @@ class RobotLink:
         self._streaming_twist = False
         self._sender_paused = False
         self._odometry = None
+        self._sensors = None
         self._status = None
 
         self._replies = []                      # unclaimed ack/pong messages
@@ -108,26 +120,70 @@ class RobotLink:
             mode: One of MODES.
             retries: How many times to send before giving up.
             timeout: Seconds to wait for each acknowledgement.
-            **params: Mode parameters, e.g. distance=0.5 for MOVE (see docs/protocol.md).
+            **params: Mode parameters, e.g. distance=0.5 for MOVE, or
+                facing="NORTH" for TURN (see docs/protocol.md).
         Returns:
             (ok, err): ok is False if the robot refused (err says why, e.g.
             "not_implemented") or never answered (err == "timeout").
         """
         if mode not in MODES:
             raise ValueError(f"unknown mode {mode!r}; expected one of {MODES}")
+        if "facing" in params and params["facing"] not in SIDES:
+            raise ValueError(f"unknown facing {params['facing']!r}; expected one of {SIDES}")
         with self._lock:
             self._streaming_twist = False  # don't send twists into a different mode
-        for _ in range(retries):
-            seq = self._send({"type": "mode", "mode": mode, **params})
-            reply = self._wait_reply(lambda m: m.get("type") == "ack" and m.get("ack_seq") == seq, timeout)
-            if reply is not None:
-                ok = bool(reply.get("ok"))
-                if ok and mode == "TWIST":
-                    with self._lock:
-                        self._twist = (0.0, 0.0)
-                        self._streaming_twist = True
-                return ok, reply.get("err", "")
-        return False, "timeout"
+        ok, err = self._send_acked({"type": "mode", "mode": mode, **params}, retries, timeout)
+        if ok and mode == "TWIST":
+            with self._lock:
+                self._twist = (0.0, 0.0)
+                self._streaming_twist = True
+        return ok, err
+
+    def set_gripper(self, lift: str | None = None, grip: str | None = None,
+                    retries: int = 3, timeout: float = 0.3) -> tuple[bool, str]:
+        """Move the gripper and wait for the robot to acknowledge.
+
+        Independent of the drive mode: works in STOP, TWIST, etc., and the robot
+        holds the gripper where it is if the link drops.
+
+        Args:
+            lift: "UP" or "DOWN", or None to leave the lift as it is.
+            grip: "OPEN" or "CLOSED", or None to leave the grip as it is.
+            retries: How many times to send before giving up.
+            timeout: Seconds to wait for each acknowledgement.
+        Returns:
+            (ok, err), as for set_mode().
+        """
+        if lift is None and grip is None:
+            raise ValueError("give lift and/or grip")
+        if lift is not None and lift not in LIFT_STATES:
+            raise ValueError(f"unknown lift {lift!r}; expected one of {LIFT_STATES}")
+        if grip is not None and grip not in GRIP_STATES:
+            raise ValueError(f"unknown grip {grip!r}; expected one of {GRIP_STATES}")
+        msg = {"type": "gripper"}
+        if lift is not None:
+            msg["lift"] = lift
+        if grip is not None:
+            msg["grip"] = grip
+        return self._send_acked(msg, retries, timeout)
+
+    def set_square_side(self, side: str, retries: int = 3, timeout: float = 0.3) -> tuple[bool, str]:
+        """Tell the robot which arena edge it just squared on.
+
+        Only accepted while SQUARE is waiting for it (status phase "WAITING");
+        otherwise the robot answers (False, "not_waiting"). On success the robot
+        corrects theta and one coordinate, and SQUARE ends with DONE. If an ack
+        is lost the retry is answered "not_waiting", so check latest_status()
+        for result DONE rather than relying on ok alone.
+
+        Args:
+            side: One of SIDES: the edge the robot is facing.
+        Returns:
+            (ok, err), as for set_mode().
+        """
+        if side not in SIDES:
+            raise ValueError(f"unknown side {side!r}; expected one of {SIDES}")
+        return self._send_acked({"type": "square_ref", "side": side}, retries, timeout)
 
     def set_twist(self, v: float, omega: float) -> None:
         """Set the velocity streamed while in TWIST mode.
@@ -160,6 +216,14 @@ class RobotLink:
         with self._lock:
             return dict(self._odometry) if self._odometry else None
 
+    def latest_sensors(self) -> dict | None:
+        """Newest sensors message (range_m, ...), or None if none yet.
+
+        range_m is None while the robot has no ultrasonic reading.
+        """
+        with self._lock:
+            return dict(self._sensors) if self._sensors else None
+
     def latest_status(self) -> dict | None:
         """Newest status message (mode, phase, result, reason, ...), or None if none yet."""
         with self._lock:
@@ -183,6 +247,15 @@ class RobotLink:
                 raise ValueError(f"message is {len(data)} bytes, max is {MAX_PAYLOAD}")
             self._sock.sendto(data, self.addr)
         return seq
+
+    def _send_acked(self, msg: dict, retries: int, timeout: float) -> tuple[bool, str]:
+        """Send msg until an ack with its seq arrives (each retry gets a new seq)."""
+        for _ in range(retries):
+            seq = self._send(msg)
+            reply = self._wait_reply(lambda m: m.get("type") == "ack" and m.get("ack_seq") == seq, timeout)
+            if reply is not None:
+                return bool(reply.get("ok")), reply.get("err", "")
+        return False, "timeout"
 
     def _pause_sender(self, paused: bool) -> None:
         """Testing only: stop/resume the background stream to trip the robot's watchdog."""
@@ -237,6 +310,9 @@ class RobotLink:
             if kind == "odometry":
                 with self._lock:
                     self._odometry = msg
+            elif kind == "sensors":
+                with self._lock:
+                    self._sensors = msg
             elif kind == "status":
                 with self._lock:
                     self._status = msg

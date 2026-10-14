@@ -13,6 +13,7 @@ class MyCommunicationChannel(QObject):
         super().__init__(parent)
 
         self._mode = None 
+        self._gripper = None
         self._is_running = False   
 
         # 0, 1 -> TWIST Movement
@@ -73,18 +74,28 @@ class MyCommunicationChannel(QObject):
                 self._cleanup_robot()
                 return
 
+            ok, err = self.robot.set_gripper("UP", "OPEN")
+            if not ok:
+                print(f"[TXRX] Failed to set gripper mode: {err}")
+                self.connection_status.emit(False)
+                self._cleanup_robot()
+                return
+
             self._mode = "TWIST"
+            self._gripper = ["UP", "OPEN"]
             self.connection_status.emit(True)
             self._is_running = True
 
             # Reset stats & timers
             self._odom_count = 0
             self._status_count = 0
+            self._sensors_count = 0
             self._last_odom = None
             self._last_status_t = None
+            self._last_sensors_t = None
             self._start_time = time.monotonic()
             self._next_print = self._start_time
-            self._end_time = self._start_time + 15 * 60.0  # 15 minutes limit
+            self._end_time = self._start_time + 30 * 60.0  
 
             # Start non-blocking periodic timer
             self._comm_timer.start()
@@ -104,54 +115,102 @@ class MyCommunicationChannel(QObject):
             self.stop_communication()
             return
 
+        # Left Stick -> 0, 1 (Move Forward/Backward depending on 1)
+        # Left Trigger -> 4 (Turn CCW)
+        # Right Trigger -> 5 (Turn CW)
+        # D-pad -> 6, 7 (Align Up/Down/Left/Right)
+        # A Button -> 8 (STOP) 
+        # B Button -> 9 (TWIST) 
+        # X Button -> 10 (Save QR Box Location) 
+        # Y Button -> 11 (SQUARE) 
+        # Left Bumper -> 12 (Gripper angle up/down)
+        # Right Bumper -> 13 (Gripper close/open)
+
         if len(self._data) > 0:
-            if self._data[4] == 1 and now >= self._next_toggle:
+            if self._data[8] == 1 and now >= self._next_toggle:
                 self._next_toggle = now + 0.5
-                if self._mode == "TWIST":
-                    print("In STOP MODE")
-                    self._mode = "STOP"
-                    self.robot.set_mode("STOP")
-                elif self._mode == "STOP":
-                    print("In TWIST MODE")
-                    self._mode = "TWIST"
-                    self.robot.set_mode("TWIST")
+                print("In STOP MODE")
+                self._mode = "STOP"
+                self.robot.set_mode("STOP")
 
-            if self._data[5] == 1 and now >= self._next_toggle:
+            if self._data[9] == 1 and now >= self._next_toggle:
                 self._next_toggle = now + 0.5
-                # Close/Open Gripper
-                print("Gripper Open/Close Toggle [NOT IMPLEMENTED FROM COMM.PY]")
-            
-            if self._data[6] == 1 and now >= self._next_toggle:
-                self._next_toggle = now + 0.5
-                # Elevate/Dive Gripper
-                print("Gripper Elevate/Dive Toggle [NOT IMPLEMENTED FROM COMM.PY]")
-
-            if self._data[7] == 1 and now >= self._next_toggle:
+                print("In TWIST MODE")
+                self._mode = "TWIST"
+                self.robot.set_mode("TWIST")
+                
+            if self._data[10] == 1 and now >= self._next_toggle:
                 self._next_toggle = now + 0.5
                 # Save Location
                 if self._last_odom:
                     self.qr_box_dropped.emit((self._last_odom["x"], self._last_odom["y"]))
 
-            if self._mode == "TWIST":
-                vel, omega = self._get_vel_resultant(self._data[0], self._data[1])
-                self.robot.set_twist(vel, omega)
+            if self._data[11] == 1 and now >= self._next_toggle:
+                self._next_toggle = now + 0.5
+                print("In SQUARE MODE")
+                self._mode = "SQUARE"
+                self.robot.set_mode("SQUARE")
 
-        # 2. Poll odometry
+            if self._data[12] == 1 and now >= self._next_toggle:
+                self._next_toggle = now + 0.5
+                if self._gripper[0] == "UP":
+                    self._gripper[0] = "DOWN"
+                else:
+                    self._gripper[0] = "UP"
+                print("New Gripper State: ", self._gripper)
+                self.robot.set_gripper(self._gripper[0], self._gripper[1])
+
+            if self._data[13] == 1 and now >= self._next_toggle:
+                self._next_toggle = now + 0.5
+                if self._gripper[1] == "OPEN":
+                    self._gripper[1] = "CLOSED"
+                else:
+                    self._gripper[1] = "OPEN"
+                print("New Gripper State: ", self._gripper)
+                self.robot.set_gripper(self._gripper[0], self._gripper[1])
+
+            if self._mode == "TWIST":               
+                omega = 0.0
+                if self._data[4] > 0.015:
+                    omega = self._data[4]
+                else:
+                    omega = -self._data[5]
+                self.robot.set_twist(self._data[1], omega)
+
+            if self._mode == "SQUARE":
+                border = None
+                if self._data[6] == 1:
+                    border = "EAST"
+                elif self._data[6] == -1:
+                    border = "WEST"
+                elif self._data[7] == 1:
+                    border = "NORTH"
+                elif self._data[7] == 1:
+                    border = "SOUTH"
+
+                if border:
+                    self.robot.set_square_side(border)
+
         o = self.robot.latest_odometry()
         if o:
             self._odom_count += 1
             self._last_odom = o
             self.updated_odometry_data.emit(o)
 
-        # 3. Poll status
         s = self.robot.latest_status()
         if s and s.get("t") != self._last_status_t:
             self._status_count += 1
             self._last_status_t = s["t"]
 
-        # 4. Periodic logging (every 0.5s)
+        sensors = self.robot.latest_sensors()
+        if sensors and sensors.get("t") != self._last_sensors_t:
+            self._sensors_count += 1
+            self._last_sensors_t = sensors["t"]
+
         if now >= self._next_print:
-            print(f"{self._next_print:.2f}    {self.fmt_status(s)}")
+            print(f"{self._next_print:.2f}")
+            print(self.fmt_status(s))
+            print(sensors)
             self._next_print += 0.5
 
     def stop_communication(self):
