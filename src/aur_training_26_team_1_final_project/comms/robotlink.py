@@ -1,7 +1,8 @@
 """Laptop-side client for the robot. Message format: docs/protocol.md.
 
-The robot runs a WiFi access point ("AUR-Team1-Robot") and listens for UDP on
-192.168.4.1:5005. RobotLink handles the protocol details for you:
+The robot joins the team router (SSID in src/SERVICE/UDP/UDP_cfg.h) and listens for UDP on
+192.168.69.50:5005 (set in src/SERVICE/UDP/UDP_cfg.h). Join the laptop to the
+same router. RobotLink handles the protocol details for you:
   - keeps the link alive: a background thread sends 50 Hz heartbeats, or
     your latest twist while the robot is in TWIST mode;
   - fills in `seq` and `t` on every message;
@@ -29,7 +30,7 @@ import socket
 import threading
 import time
 
-DEFAULT_HOST = "192.168.4.1"
+DEFAULT_HOST = "192.168.69.50"
 DEFAULT_PORT = 5005
 MAX_PAYLOAD = 1472
 
