@@ -205,6 +205,13 @@ size_t Protocol::encodeSensors(const Sensors &sensors, uint32_t seq,
   } else {
     doc_["range_m"] = sensors.rangeM;
   }
+  if (sensors.hasIr) {
+    doc_["ir_left"] = sensors.irLeft;
+    doc_["ir_right"] = sensors.irRight;
+  } else {
+    doc_["ir_left"] = nullptr; // not read yet
+    doc_["ir_right"] = nullptr;
+  }
   return finish(buf, cap);
 }
 

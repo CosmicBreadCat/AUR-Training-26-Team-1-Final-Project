@@ -81,6 +81,9 @@ struct Odometry {
 
 struct Sensors {
   float rangeM; // ultrasonic range (m), NAN when there is no reading
+  bool hasIr;   // false until the IR line sensors are read
+  bool irLeft;  // front-left IR sees the line
+  bool irRight; // front-right IR sees the line
 };
 
 struct Status {

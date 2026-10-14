@@ -52,12 +52,12 @@ Examples:
 | `type` | Fields | Rate |
 |---|---|---|
 | `odometry` | `x`, `y` (m), `theta` (rad), `v` (m/s), `omega` (rad/s) | 20 Hz |
-| `sensors` | `range_m` (ultrasonic range in m, or `null` when there's no reading) | 10 Hz |
+| `sensors` | `range_m` (ultrasonic range in m, or `null` when there's no reading), `ir_left`, `ir_right` (`true` = that front-corner IR sees the boundary line; `null` until the IR sensors are read) | 10 Hz |
 | `status` | `mode`, `phase`, `result`, `reason`, `cmd_seq`, `lift`, `grip`, `watchdog`, `rx_ok`, `rx_bad` | 5 Hz, plus immediately on any change |
 | `ack` | `ack_seq`, `ok`, `err` | reply to each `mode` and `gripper` |
 | `pong` | `ping_t` (the `t` of the ping) | reply to each `ping` |
 
-`odometry` is all zeros until the encoders are integrated, and `sensors.range_m` is always `null` until the ultrasonic driver exists.
+`odometry` is all zeros until the encoders are integrated. In `sensors`, `range_m` is always `null` until the ultrasonic driver exists, and `ir_left` / `ir_right` until the IR driver exists.
 
 `status` fields:
 
@@ -86,6 +86,10 @@ Examples:
 - **Sequence numbers.** The robot drops a packet whose `seq` is not higher than the last one it accepted. Once the watchdog has tripped, any `seq` is accepted, so a restarted script can reconnect. RobotLink starts `seq` from the wall clock, so restarts are accepted right away.
 - **Watchdog.** Any valid packet keeps the link alive. After **300 ms** with no valid packet, the robot switches to STOP and reports `result: FAILED, reason: watchdog`. It stays in STOP until it receives a new `mode` command. The gripper is **not** affected: it holds its state.
 - **Stream staleness.** In TWIST, if no `twist` arrives for 300 ms, the robot sets v and ω to 0 (`phase: NO_INPUT`), even if heartbeats keep the link alive.
+- **Edge guard.** In every mode except SQUARE, a wheel whose front-corner IR sees the boundary line can't drive forward; it can still stop or reverse. Backing off and turning away work normally, and pushing straight on makes the robot pivot square to the edge instead of crossing it. Watch `sensors.ir_left` / `ir_right` to see when it's acting. Limits:
+  - **Forward only:** there are no rear sensors, so reversing over a line isn't caught.
+  - **No override.**
+  - **Not active yet:** it switches on once the IR sensors are read (`ir_*` no longer `null`).
 - **Preemption.** A new `mode` command replaces the current one immediately. The old command reports `PREEMPTED` with its own `cmd_seq`.
 - **Repeats.** Sending the mode the robot is already running (e.g. a retry after a lost ack) is acknowledged and changes nothing: `cmd_seq` stays that of the command that started the mode, so the mode isn't restarted.
 - **End of a mode.** When a mode reports DONE or FAILED, the robot returns to STOP, keeping that command's `cmd_seq`, `result` and `reason` in the status.

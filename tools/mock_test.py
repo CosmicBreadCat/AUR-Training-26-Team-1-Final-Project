@@ -11,7 +11,7 @@ Steps:
   4. MOVE, TURN: acked, then the control-task stub reports FAILED
      (not_implemented, missing_distance / missing_angle, conflicting_target)
      and the robot returns to STOP.
-  5. sensors: ~10 Hz, range_m None (no ultrasonic driver yet).
+  5. sensors: ~10 Hz, range_m / ir_left / ir_right None (no drivers yet).
 
 TURN facing before any square_ref since boot fails with no_heading_ref; that
 only reproduces right after a reboot, so it isn't checked here.
@@ -140,7 +140,8 @@ def main():
             time.sleep(0.002)
         z = robot.latest_sensors() or {}
         check(7 <= count / 2.0 <= 13, f"sensors {count / 2.0:.1f} Hz (expect ~10)")
-        check("range_m" in z and z["range_m"] is None, f"range_m={z.get('range_m', 'missing')} (expect None)")
+        for key in ("range_m", "ir_left", "ir_right"):
+            check(key in z and z[key] is None, f"{key}={z.get(key, 'missing')} (expect None)")
 
         robot.set_mode("STOP")
 

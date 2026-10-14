@@ -217,9 +217,12 @@ class RobotLink:
             return dict(self._odometry) if self._odometry else None
 
     def latest_sensors(self) -> dict | None:
-        """Newest sensors message (range_m, ...), or None if none yet.
+        """Newest sensors message (range_m, ir_left, ir_right, ...), or None if none yet.
 
-        range_m is None while the robot has no ultrasonic reading.
+        range_m is None while the robot has no ultrasonic reading. ir_left /
+        ir_right are True while that front-corner IR sees the boundary line
+        (the robot then won't drive that wheel forward), None until the IR
+        sensors are read.
         """
         with self._lock:
             return dict(self._sensors) if self._sensors else None

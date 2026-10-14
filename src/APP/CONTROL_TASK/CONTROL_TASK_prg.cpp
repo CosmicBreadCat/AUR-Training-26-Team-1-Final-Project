@@ -16,7 +16,7 @@ static bool bHaveActive = false;    // false until the first command is read
 static uint32_t u32GripperSeq = 0;  // last gripper command acted on
 static bool bHaveGripper = false;
 static Odometry xOdom = {};         // set to the boot pose in CONTROLTASK_bStart
-static Sensors xSensors = {NAN};    // NAN = no reading
+static Sensors xSensors = {NAN};    // no reading, IR not read (hasIr false)
 static bool bHaveHeadingRef = false; // a square_ref has set theta since boot
 static bool bSquareDone = false;     // the current SQUARE has used its square_ref
 
@@ -68,7 +68,10 @@ static void vOdometryStep(void) {
   // TODO odometry: integrate x, y, theta from the wheel distances and the
   //      gyro heading into xOdom (x, y, theta, v, omega).
   // TODO ultrasonic: latest median-filtered range into xSensors.rangeM.
-  // TODO IR line sensors: read the trip latches set by their interrupts.
+  // TODO IR line sensors: read both inputs (GPIO_u8GetPinValue, pins and
+  //      active level in _cfg.h) into xSensors.irLeft / irRight and set
+  //      xSensors.hasIr = true. That also arms the edge guard. SQUARE will
+  //      additionally need the trip latches set by their interrupts.
 
   COMMTASK_vSetOdometry(&xOdom);
   COMMTASK_vSetSensors(&xSensors);
@@ -81,15 +84,40 @@ static void vEnterMode(const MotionCommand_t *Copy_pxCmd) {
   //      the start point, init the slew limiters from the measured v, omega.
 }
 
+/* Edge guard for one wheel: while its IR sees the boundary line it may stop
+ * or reverse, but not drive forward (towards the line). */
+static float fGuardWheel(float Copy_fTarget, bool Copy_bOnLine) {
+  return (Copy_bOnLine && Copy_fTarget > 0.0f) ? 0.0f : Copy_fTarget;
+}
+
+/* Every mode's wheel speed targets (rad/s, + = forward) go through here, so
+ * the edge guard can't be bypassed. SQUARE is exempt: it drives onto the
+ * line on purpose. The guard only covers forward motion (no rear sensors). */
+static void vSetWheelTargets(float Copy_fWl, float Copy_fWr) {
+  if (xActive.mode != RobotMode::Square && xSensors.hasIr) {
+    Copy_fWl = fGuardWheel(Copy_fWl, xSensors.irLeft);
+    Copy_fWr = fGuardWheel(Copy_fWr, xSensors.irRight);
+  }
+  // TODO wheel loops: FF + PI per wheel towards Copy_fWl / Copy_fWr,
+  //      duty = V / V_batt, written to the motor driver.
+  (void)Copy_fWl;
+  (void)Copy_fWr;
+}
+
 static void vStepStop(void) {
-  // TODO ramp v, omega to 0 through the slew limiter, then set duty 0 (coast).
+  // TODO ramp to 0 through the slew limiter first, then coast (duty 0).
+  vSetWheelTargets(0.0f, 0.0f);
 }
 
 static void vStepTwist(const MotionCommand_t *Copy_pxCmd) {
-  (void)Copy_pxCmd;
-  // TODO slew-limit Copy_pxCmd->v / omega, inverse kinematics, desaturate,
-  //      run both wheel loops (FF + PI), duty = V / V_batt.
-  //      Hold heading on the gyro while omega == 0.
+  // TODO slew-limit v / omega first, and hold heading on the gyro while
+  //      omega == 0.
+  const float fR = CONTROLTASK_WHEEL_RADIUS_M;
+  const float fHalfB = CONTROLTASK_TRACK_WIDTH_M / 2.0f;
+  float fWl = (Copy_pxCmd->v - Copy_pxCmd->omega * fHalfB) / fR;
+  float fWr = (Copy_pxCmd->v + Copy_pxCmd->omega * fHalfB) / fR;
+  // TODO desaturate: scale both by min(1, w_max / max(|fWl|, |fWr|)).
+  vSetWheelTargets(fWl, fWr);
 }
 
 /* Reports progress of the current mode. DONE/FAILED end it: the comms task
@@ -115,7 +143,8 @@ static void vStepMove(const MotionCommand_t *Copy_pxCmd, bool Copy_bEntering) {
    *   - DONE when |distance error| < 1 cm and |v| ~ 0 for 100 ms
    * Report progress with COMMTASK_vSetMotionResult(RUNNING, "DRIVING").
    * FAILED reasons: timeout (> 2x planned time), stall (duty saturated, no
-   * encoder motion), obstacle (ultrasonic range below the guard distance). */
+   * encoder motion), obstacle (ultrasonic range below the guard distance).
+   * Route the wheel targets through vSetWheelTargets (edge guard). */
   if (Copy_bEntering) {
     vReportFailed(Copy_pxCmd, isnan(Copy_pxCmd->params.distance)
                                   ? "missing_distance"
@@ -133,7 +162,8 @@ static void vStepTurn(const MotionCommand_t *Copy_pxCmd, bool Copy_bEntering) {
    *   - v_cmd: distance loop holding 0 so the robot doesn't creep
    *   - DONE when |heading error| < 1 deg and |omega| ~ 0 for 100 ms
    * Report progress with COMMTASK_vSetMotionResult(RUNNING, "TURNING").
-   * FAILED reasons: timeout, stall. */
+   * FAILED reasons: timeout, stall.
+   * Route the wheel targets through vSetWheelTargets (edge guard). */
   if (Copy_bEntering) {
     bool bHasAngle = !isnan(Copy_pxCmd->params.angle);
     bool bHasFacing = Copy_pxCmd->params.hasFacing;
@@ -158,6 +188,8 @@ static void vStepSquare(const MotionCommand_t *Copy_pxCmd, bool Copy_bEntering) 
    *   WAITING      wait (no timeout) for the driver's square_ref
    * Report each phase with vReportResult(RUNNING, phase).
    * FAILED reasons: no_line (max_search driven), one_side_only, timeout.
+   * Route the wheel targets through vSetWheelTargets (the edge guard is off
+   * in SQUARE, since it drives onto the line on purpose).
    * MOCK: the physical phases are skipped; SQUARE goes straight to WAITING. */
   if (Copy_bEntering) {
     bSquareDone = false;
