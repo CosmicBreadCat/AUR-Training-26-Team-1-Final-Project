@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtCore import Qt, Signal, QObject
+from PySide6.QtCore import Qt, Signal, QObject, QTimer
 
 class MyInfo(QWidget):
 
@@ -17,25 +17,30 @@ class MyInfo(QWidget):
         palette.setColor(QPalette.ColorRole.Window, QColor("#3e3e3e"))
         self.setPalette(palette)
 
-
         self._odometry_label = QLabel('Odometry')
         self._odometry_label.setStyleSheet('font-size: 20px; font-weight: bold;')
 
-        self._speed_label = QLabel('Speed: 0 m/s')
+        self._linear_speed_label = QLabel('Linear Speed: 0 m/s')
+        self._angular_speed_label = QLabel('Angular Speed: 0 rad/s')
         self._coord_label = QLabel('Coordinates: (0, 0)')
         self._angle_label = QLabel('Angle: 0 degrees')
-        self._qr_boxes_labels = []
+        self._qr_boxes_dropped_label = QLabel('QR Dropped Boxes: \n')
+        self._qr_boxes_detected_label = QLabel('QR Detected Boxes: \n')
 
         self._data = QObject()
-        self._data.speed = 0
+        self._data.linear_speed = 0
+        self._data.angular_speed = 0
         self._data.coord = (0, 0)
         self._data.angle = 0
 
         self._layout_1 = QVBoxLayout()
 
-        self._layout_1.addWidget(self._speed_label)
+        self._layout_1.addWidget(self._linear_speed_label)
+        self._layout_1.addWidget(self._angular_speed_label)
         self._layout_1.addWidget(self._coord_label)
         self._layout_1.addWidget(self._angle_label)
+        self._layout_1.addWidget(self._qr_boxes_dropped_label)
+        self._layout_1.addWidget(self._qr_boxes_detected_label)
 
         self._container = QVBoxLayout(self)
 
@@ -47,20 +52,39 @@ class MyInfo(QWidget):
 
         self._layout_1.addStretch()
 
-    def update_data(self, new_data:QObject):
-        self._data.speed = new_data.speed
-        self._data.angle = new_data.angle
-        self._data.coord = new_data.coord
-        self._data.qr_boxes = new_data.qr_boxes
+        self._timer = QTimer()
+        self._timer.setInterval(20)
+        self._timer.timeout.connect(self._update_widgets)
 
-        for i in range(len(new_data.qr_boxes)):
+    def update_data(self, new_data:dict):
+        if not new_data:
+            return
+        self._data.linear_speed = new_data["v"]
+        self._data.angular_speed = new_data["omega"]
+        self._data.angle = new_data["theta"]
+        self._data.coord = (new_data["x"], new_data["y"])
 
-            if i >= len(self._qr_boxes_labels):
-                self._qr_boxes_labels.append(QLabel(f'QR Box {i}: {self._data.qr_boxes[i]}'))
-                self._layout_1.addWidget(self._qr_boxes_labels[i])
-            else:
-                self._qr_boxes_labels.setText(f'QR Box {i}: {self._data.qr_boxes[i]}')
+    def update_qr_boxes_dropped(self, new_coord: tuple):
+        self._data.qr_boxes_dropped.append(new_coord)
 
-        self._speed_label.setText(f'Speed: {new_data.speed}')
-        self._coord_label.setText(f'Coordinates: {new_data.coord}')
-        self._angle_label.setText(f'Angle: {new_data.angle}')
+    def _update_widgets(self):
+        
+        self._linear_speed_label.setText(f'Linear Speed: {self._data.linear_speed}')
+        self._angular_speed_label.setText(f'Angular Speed: {self._data.angular_speed}')
+        self._coord_label.setText(f'Coordinates: {self._data.coord}')
+        self._angle_label.setText(f'Angle: {self._data.angle}')
+
+        text = "QR Boxes Dropped: \n"
+
+        for coord in self._data.qr_boxes_dropped:
+            text += f"{coord}\n"
+
+        self._qr_boxes_dropped_label.setText(text)
+
+        text = "QR Boxes Detected: \n"
+
+        for coord in self._data.qr_boxes_detected:
+            text += f"{coord}\n"
+            
+        self._qr_boxes_detected_label.setText(text)
+            

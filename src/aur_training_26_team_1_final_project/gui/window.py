@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import QMainWindow, QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtCore import QThread
 from aur_training_26_team_1_final_project.gui.modes import MyModes
 from aur_training_26_team_1_final_project.gui.info import MyInfo
 from aur_training_26_team_1_final_project.gui.status import MyStatus
 from aur_training_26_team_1_final_project.cv.camera import MyCamera
 from aur_training_26_team_1_final_project.comms.controller import MyController
 from aur_training_26_team_1_final_project.comms.comm import MyCommunicationChannel
+import threading
 
 
 class Window(QMainWindow):
@@ -20,7 +22,6 @@ class Window(QMainWindow):
         self._status = MyStatus()
         self._camera = MyCamera()
         self._controller = MyController()
-        self._comm = MyCommunicationChannel()
 
         self._central_layout = QVBoxLayout()
         self._central_layout.addWidget(self._camera)
@@ -42,13 +43,41 @@ class Window(QMainWindow):
         self.setCentralWidget(self._widget)
 
         self.show()
+        self.thread = QThread()
+        self._worker = MyCommunicationChannel()
+        self._worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self._worker.start_communication)
+        self._worker.finished.connect(self.thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        # self._worker.updated_odometry_data.connect(self.handle_incoming_data)
+        # self._worker.connection_status.connect(self.update_status)
+
+        self.thread.start()
+
+        def handle_incoming_data(self, message: str):
+            self.log_view.append(message)
+
+        def update_status(self, is_connected: bool):
+            if not is_connected:
+                self.log_view.append("--- Disconnected ---")
+                self.start_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
 
         self._status.motion_started.connect(self._modes.motion_started)
         self._status.motion_stopped.connect(self._modes.motion_stopped)
+
         self._modes.autonomous_updated.connect(self._status.update_autonomous_mode)
         self._modes.colors_updated.connect(self._status.update_colors)
         self._modes.colors_updated.connect(self._camera.detector.update_colors)
         self._modes.boxes_picked.connect(self._status.update_picked_boxes)                        
+
         self._camera.fps_updated.connect(self._status.update_fps)
         self._camera.connection_updated.connect(self._status.update_connection_status)
-        self._controller.controller_input_updated.connect(self._comm.get_input)     
+
+        self._controller.controller_input_updated.connect(self._worker.get_input)   
+
+        self._worker.qr_box_dropped.connect(self._info.update_qr_boxes_dropped)
+        self._worker.updated_odometry_data.connect(self._info.update_data)
