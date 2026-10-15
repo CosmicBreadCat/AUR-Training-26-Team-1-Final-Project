@@ -3,13 +3,13 @@ import QtQuick
 import QtQuick.Shapes
 
 Rectangle{
-    // required property var data
+    required property var compassData
     property int angle: 0
 
     id: root
-    width: 100
+    width: 150
     height: width
-    color: '#b3ee3e'
+    color: '#3e3e3e'
 
     Rectangle{
         id: compass
@@ -22,7 +22,7 @@ Rectangle{
         anchors.centerIn: root
 
         Repeater{
-            model: 60
+            model: 8
 
             delegate:Item{
                 id: tickContainer
@@ -34,12 +34,12 @@ Rectangle{
                 anchors.top: compass.top
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                rotation: index * 6
+                rotation: index * 45
                 transformOrigin: Item.Bottom
 
                 Rectangle{
-                    width: (parent.index%5 ? 2 : 5)
-                    height: (parent.index%5 ? 10 : 12)
+                    width: (parent.index%2 ? 2 : 5)
+                    height: (parent.index%2 ? 10 : 12)
                     color: 'black'
                     anchors.top: parent.top
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -50,7 +50,7 @@ Rectangle{
 
         Shape{
             id: arrow
-            anchors.topMargin: parent.height * 0.05
+            anchors.topMargin: parent.height * 0.1
             anchors.top: parent.top
             anchors.bottom: parent.verticalCenter
             anchors.horizontalCenter: parent.horizontalCenter

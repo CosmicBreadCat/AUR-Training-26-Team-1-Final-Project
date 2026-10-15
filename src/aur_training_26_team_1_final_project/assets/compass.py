@@ -9,8 +9,9 @@ class Compass(QQuickWidget):
                 parent: QWidget | None = None):
         super().__init__(parent)
 
-        self.setInitialProperties({"data": data_bridge})
+        self.setInitialProperties({"compassData": data_bridge})
         
         self.setSource(QUrl.fromLocalFile(get_asset(widget_filepath)))
         
-        self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+        # self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+        self.setResizeMode(QQuickWidget.ResizeMode.SizeViewToRootObject)

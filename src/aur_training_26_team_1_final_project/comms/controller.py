@@ -128,7 +128,7 @@ class MyController(QObject):
                     inputs[i] = 0
 
             # For debugging
-            print(inputs)
+            # print(inputs)
 
             self.controller_input_updated.emit(inputs)
 

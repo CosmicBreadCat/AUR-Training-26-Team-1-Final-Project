@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 from aur_training_26_team_1_final_project.gui.data import MyData
+from aur_training_26_team_1_final_project.assets.compass import Compass
 
 class MyInfo(QWidget):
 
@@ -28,11 +29,21 @@ class MyInfo(QWidget):
         self._qr_boxes_dropped_label = QLabel('QR Dropped Boxes: \n')
         self._qr_boxes_detected_label = QLabel('QR Detected Boxes: \n')
 
+
+        self._linear_speed_label.setStyleSheet('font-size: 14px;')
+        self._angular_speed_label.setStyleSheet('font-size: 14px;')
+        self._coord_label.setStyleSheet('font-size: 14px;')
+        self._angle_label.setStyleSheet('font-size: 14px;')
+        self._qr_boxes_dropped_label.setStyleSheet('font-size: 14px;')
+        self._qr_boxes_detected_label.setStyleSheet('font-size: 14px;')
+
         self._data = MyData(self)
         self._data.linear_speed = 0
         self._data.angular_speed = 0
         self._data.coord = (0, 0)
         self._data.angle = 0
+        
+        self._compass = Compass("compass.qml", self._data, self)
 
         self._layout_1 = QVBoxLayout()
 
@@ -40,6 +51,7 @@ class MyInfo(QWidget):
         self._layout_1.addWidget(self._angular_speed_label)
         self._layout_1.addWidget(self._coord_label)
         self._layout_1.addWidget(self._angle_label)
+        self._layout_1.addWidget(self._compass, alignment=Qt.AlignmentFlag.AlignCenter)
         self._layout_1.addWidget(self._qr_boxes_dropped_label)
         self._layout_1.addWidget(self._qr_boxes_detected_label)
 

@@ -13,7 +13,7 @@ class Window(QMainWindow):
     
         super().__init__()
         self.setWindowTitle("Console")
-        self.resize(800, 600)
+        self.resize(1000, 600)
 
         self._modes = MyModes()
         self._info = MyInfo()
