@@ -1,15 +1,20 @@
 #include "MPU_int.h"
 #include "MPU_cfg.h"
 
-void MPU6050_vInit(I2C_Port_t Copy_xPort) {
+I2C_Status_t MPU6050_vInit(I2C_Port_t Copy_xPort) {
     /* 
      * Write 0x00 to Power Management Register 1 (0x6B) 
      * This clears the SLEEP bit, wakes up the sensor, and selects internal 8MHz oscillator.
      */
-    I2C_xWriteRegister(Copy_xPort, MPU6050_I2C_ADDR, MPU6050_REG_PWR_MGMT_1, 0x00);
+    return I2C_xWriteRegister(Copy_xPort, MPU6050_I2C_ADDR,
+                              MPU6050_REG_PWR_MGMT_1, 0x00);
 }
 
-void MPU6050_vReadData(I2C_Port_t Copy_xPort, MPU6050_Data_t *PsData) {
+I2C_Status_t MPU6050_vReadData(I2C_Port_t Copy_xPort, MPU6050_Data_t *PsData) {
+    if (PsData == NULL) {
+        return I2C_ERR_FAIL;
+    }
+
     uint8_t u8Buffer[14];
 
     /* 
@@ -18,7 +23,11 @@ void MPU6050_vReadData(I2C_Port_t Copy_xPort, MPU6050_Data_t *PsData) {
      * - Bytes 6-7:   Temperature
      * - Bytes 8-13:  Gyro X, Y, Z
      */
-    if (I2C_xReadBytes(Copy_xPort, MPU6050_I2C_ADDR, MPU6050_REG_ACCEL_XOUT_H, u8Buffer, 14) == I2C_OK) {
+    I2C_Status_t xStatus = I2C_xReadBytes(
+        Copy_xPort, MPU6050_I2C_ADDR, MPU6050_REG_ACCEL_XOUT_H, u8Buffer, 14);
+    if (xStatus != I2C_OK) {
+        return xStatus;
+    }
         
         /* Combine high and low bytes for Accelerometer */
         int16_t s16RawAccelX = (int16_t)((u8Buffer[0] << 8) | u8Buffer[1]);
@@ -38,5 +47,6 @@ void MPU6050_vReadData(I2C_Port_t Copy_xPort, MPU6050_Data_t *PsData) {
         PsData->fGyroX  = (float)s16RawGyroX  / MPU6050_GYRO_SENSITIVITY;
         PsData->fGyroY  = (float)s16RawGyroY  / MPU6050_GYRO_SENSITIVITY;
         PsData->fGyroZ  = (float)s16RawGyroZ  / MPU6050_GYRO_SENSITIVITY;
-    }
+
+    return I2C_OK;
 }

@@ -7,6 +7,7 @@
 /* Register Map Definitions */
 #define MPU6050_REG_PWR_MGMT_1       0x6B
 #define MPU6050_REG_ACCEL_XOUT_H     0x3B
+#define MPU6050_REG_WHO_AM_I         0x75
 
 /* Sensitivity Scale Factors (Default settings: Accel = +-2g, Gyro = +-250 deg/s) */
 #define MPU6050_ACCEL_SENSITIVITY    16384.0f

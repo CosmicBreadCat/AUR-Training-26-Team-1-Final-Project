@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include "driver/pcnt.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* PCNT Hardware Units */
 typedef enum {
     PCNT_UNIT_INDEX_0 = PCNT_UNIT_0,
@@ -38,5 +42,9 @@ int16_t PCNT_s16GetCount(PCNT_Unit_t Copy_xUnit);
  * @param Copy_xUnit Target PCNT unit.
  */
 void PCNT_vClearCount(PCNT_Unit_t Copy_xUnit);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* PCNT_INT_H_ */

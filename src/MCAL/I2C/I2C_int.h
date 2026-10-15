@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include "driver/i2c.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* I2C Peripheral Index */
 typedef enum {
     I2C_PORT_0 = I2C_NUM_0,
@@ -59,5 +63,9 @@ I2C_Status_t I2C_xReadRegister(I2C_Port_t Copy_xPort, uint8_t Copy_u8DevAddr, ui
  * @return I2C_Status_t Status code.
  */
 I2C_Status_t I2C_xReadBytes(I2C_Port_t Copy_xPort, uint8_t Copy_u8DevAddr, uint8_t Copy_u8StartRegAddr, uint8_t *Pu8Buffer, uint32_t Copy_u32Len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* I2C_INT_H_ */
