@@ -9,8 +9,8 @@ class MyDetector(QObject):
         super().__init__()
 
         #Hue Colors
-        self._colors = [160, 10, 35, 85, 100, 140]
-        
+        self._colors = [100, 140, 160, 10, 35, 85]
+
         self._qr_detector = cv2.QRCodeDetector()
 
     def _qimage_to_cv2(self, frame: QImage):

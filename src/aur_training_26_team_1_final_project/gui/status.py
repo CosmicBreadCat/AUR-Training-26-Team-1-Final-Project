@@ -23,7 +23,7 @@ class MyStatus(QWidget):
         # Box Colors
         # It is okay to have lower hue greater than upper hue
         # It is intended to handle cyclic hue segments in OpenCV
-        self._colors = [160, 10, 35, 85, 100, 140]
+        self._colors = [100, 140, 160, 10, 35, 85]
 
         # 0 -> Disconnected, 1 -> Connected
         self._connection_status = 0
