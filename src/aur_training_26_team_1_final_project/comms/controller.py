@@ -55,6 +55,9 @@ class MyController(QObject):
         self._timer.timeout.connect(self._get_data)
         self._timer.start()
 
+        # 0 -> XBOX Controller, 1 -> PS3 Controller
+        self._used_controller = 1 
+
     def _get_data(self):
 
         try: 
@@ -80,12 +83,52 @@ class MyController(QObject):
             inputs[4] = (inputs[4]+1.0)/2.0
             inputs[5] = (inputs[5]+1.0)/2.0
 
+            if self._used_controller == 1:
+                # Left X -> 0
+                # Left Y -> 1 (1 to -1) changed to (-1 to 1)
+                # Right X -> 3 
+                # Right Y -> 2 (1 to -1) changed to (-1 to 1) 
+                # Left Trigger -> 10 (Digital in other controller)
+                # Right Trigger -> 11 (Digital in other controller)
+                # D-Pad X -> 4 (0, 0.5, 1) changed to (-1, 0, 1)
+                # D-Pad Y -> 5 (0, 0.5, 1) changed to (-1, 0, 1)
+                # Button A -> 8
+                # Button B -> 7
+                # Button X -> 9 
+                # Button Y -> 6
+                # Left Bumper -> 12
+                # Right Bumper -> 13
+
+                mapped_inputs = inputs.copy()
+
+                mapped_inputs[2], mapped_inputs[3] = inputs[3], inputs[2]
+
+                mapped_inputs[1] *= -1
+                mapped_inputs[3] *= -1
+
+                mapped_inputs[4] = inputs[10]
+                mapped_inputs[5] = inputs[11]
+
+                mapped_inputs[6] = inputs[4] * 2 - 1
+                mapped_inputs[7] = inputs[5] * 2 - 1
+
+                mapped_inputs[8] = inputs[8]
+                mapped_inputs[9] = inputs[7]
+                mapped_inputs[10] = inputs[9]
+                mapped_inputs[11] = inputs[6]
+                mapped_inputs[12] = inputs[12]
+                mapped_inputs[13] = inputs[13]
+
+
+                inputs = mapped_inputs
+
+
+            for i in range(len(inputs)):
+                if abs(inputs[i]) < 0.015:
+                    inputs[i] = 0
+
             # For debugging
             print(inputs)
-
-            for i in inputs:
-                if abs(i) < 0.015:
-                    i = 0
 
             self.controller_input_updated.emit(inputs)
 
