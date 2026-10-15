@@ -1,3 +1,5 @@
+.venv
 .vscode
+test_pics/
 .pio
 __pycache__/
