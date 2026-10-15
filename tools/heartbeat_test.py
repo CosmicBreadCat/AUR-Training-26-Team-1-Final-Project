@@ -2,7 +2,7 @@
 """Exercise modes, twist streaming, telemetry rates and the robot's watchdog.
 
 Steps:
-  1. MOVE should be refused with "not_implemented" (not built yet).
+  1. APPROACH should be refused at the ack with "not_implemented" (not built yet).
   2. TWIST is accepted; stream v=0.2 m/s for 3 s while printing status.
   3. Pause the background stream (simulated laptop crash) and time how long
      the robot takes to report watchdog + STOP. Expect ~300 ms.
@@ -38,8 +38,8 @@ def main():
         rtt = robot.ping()
         print(f"ping: {rtt:.1f} ms" if rtt is not None else "ping: no reply")
 
-        print("\n[1] MOVE (expect not_implemented)")
-        print("   ", robot.set_mode("MOVE", distance=0.5))
+        print("\n[1] APPROACH (expect not_implemented)")
+        print("   ", robot.set_mode("APPROACH", grab_distance=0.1))
 
         print("\n[2] TWIST, streaming v=0.2 m/s")
         ok, err = robot.set_mode("TWIST")
