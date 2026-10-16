@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include "HAL/MOTOR/MOTOR_int.h"
+#include "HAL/Gripper/GRIPPER_int.h"
 #include "HAL/MPU6050/MPU_int.h"
 #include "HAL/MPU6050/MPU_cfg.h"
 #include "HAL/PCNT/PCNT_int.h"
@@ -45,11 +47,18 @@ static void vInitSensors(void) {
   Serial.println("Wheel encoders initialized; rotate wheels to test pulses");
 }
 
+/* Motors and gripper must be ready before the control task starts using them */
+static void vInitActuators(void) {
+  MOTOR_vInit();   // motors start stopped
+  GRIPPER_vInit(); // servos go to the start pose from GRIPPER_cfg.h
+  Serial.println("Motors and gripper initialized");
+}
 void setup() {
   Serial.begin(115200);
   delay(200);
 
   vInitSensors();
+  vInitActuators();
 
   if (!COMMTASK_bStart()) {
     Serial.println("ERROR: comm task failed to start");
