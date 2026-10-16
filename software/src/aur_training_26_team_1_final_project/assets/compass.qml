@@ -4,7 +4,7 @@ import QtQuick.Shapes
 
 Rectangle{
     required property var compassData
-    property int angle: 0
+    property int angle: compassData.angle
 
     id: root
     width: 150
