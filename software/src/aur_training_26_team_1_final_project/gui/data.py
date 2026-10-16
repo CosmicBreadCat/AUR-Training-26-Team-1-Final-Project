@@ -7,6 +7,7 @@ class MyData(QObject):
     angle_changed = Signal()
     qr_boxes_dropped_changed = Signal()
     qr_boxes_detected_changed = Signal()
+    qr_boxes_on_camera_changed = Signal()
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -17,6 +18,7 @@ class MyData(QObject):
         self._angle = 0
         self._qr_boxes_dropped = []
         self._qr_boxes_detected = []
+        self._qr_boxes_on_camera = []
 
     @Property(int, notify=linear_speed_changed)
     def linear_speed(self):
@@ -71,3 +73,12 @@ class MyData(QObject):
     def qr_boxes_detected(self, new:list):
         self._qr_boxes_detected = new
         self.qr_boxes_detected_changed.emit()
+
+    @Property(list, notify=qr_boxes_on_camera_changed)
+    def qr_boxes_on_camera(self):
+        return self._qr_boxes_on_camera
+
+    @qr_boxes_on_camera.setter
+    def qr_boxes_on_camera(self, new:list):
+        self._qr_boxes_on_camera = new
+        self.qr_boxes_on_camera_changed.emit()

@@ -28,7 +28,7 @@ class MyInfo(QWidget):
         self._angle_label = QLabel('Angle: 0 degrees')
         self._qr_boxes_dropped_label = QLabel('QR Dropped Boxes: \n')
         self._qr_boxes_detected_label = QLabel('QR Detected Boxes: \n')
-
+        self._qr_boxes_on_camera_label = QLabel('QR Boxes on Camera: \n')
 
         self._linear_speed_label.setStyleSheet('font-size: 14px;')
         self._angular_speed_label.setStyleSheet('font-size: 14px;')
@@ -36,6 +36,7 @@ class MyInfo(QWidget):
         self._angle_label.setStyleSheet('font-size: 14px;')
         self._qr_boxes_dropped_label.setStyleSheet('font-size: 14px;')
         self._qr_boxes_detected_label.setStyleSheet('font-size: 14px;')
+        self._qr_boxes_on_camera_label.setStyleSheet('font-size: 14px;')
 
         self._data = MyData(self)
         self._data.linear_speed = 0
@@ -54,6 +55,7 @@ class MyInfo(QWidget):
         self._layout_1.addWidget(self._compass, alignment=Qt.AlignmentFlag.AlignCenter)
         self._layout_1.addWidget(self._qr_boxes_dropped_label)
         self._layout_1.addWidget(self._qr_boxes_detected_label)
+        self._layout_1.addWidget(self._qr_boxes_on_camera_label)
 
         self._container = QVBoxLayout(self)
 
@@ -80,11 +82,14 @@ class MyInfo(QWidget):
 
     def update_qr_boxes_dropped(self, new_coord: tuple):
         self._data.qr_boxes_dropped.append(new_coord)
+        self._data.qr_boxes_detected.erase(new_coord)
 
     def update_qr_boxes_detected(self, new: list):
-        self._data.qr_boxes_detected = []
+        self._data.qr_boxes_on_camera = []
         for qr_code in new:
-            self._data.qr_boxes_detected.append(qr_code["text"])
+            if not qr_code["text"] in self._data.qr_boxes_detected:
+                self._data.qr_boxes_detected.append(qr_code["text"])
+            self._data.qr_boxes_on_camera.append(qr_code["text"])
 
     def _update_widgets(self):
         
@@ -100,9 +105,16 @@ class MyInfo(QWidget):
 
         self._qr_boxes_dropped_label.setText(text)
 
-        text = "QR Boxes Detected: \n"
+        text = "QR Boxes Detected while not Dropped: \n"
 
         for coord in self._data.qr_boxes_detected:
             text += f"{coord}\n"
             
         self._qr_boxes_detected_label.setText(text)
+        
+        text = "QR Boxes On Camera Feed: \n"
+        
+        for coord in self._data.qr_boxes_on_camera:
+            text += f"{coord}\n"
+            
+        self._qr_boxes_on_camera_label.setText(text)
