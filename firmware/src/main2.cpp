@@ -1,14 +1,13 @@
-#include <Arduino.h>
-#include "HAL/MOTOR/MOTOR_int.h"
-#include "HAL/Gripper/GRIPPER_int.h"
-#include "HAL/MPU6050/MPU_int.h"
-#include "HAL/MPU6050/MPU_cfg.h"
-#include "HAL/PCNT/PCNT_int.h"
-#include "HAL/PCNT/PCNT_cfg.h"
-#include "MCAL/I2C/I2C_cfg.h"
 #include "APP/COMM_TASK/COMM_TASK_int.h"
 #include "APP/CONTROL_TASK/CONTROL_TASK_int.h"
+#include "HAL/GRIPPER/GRIPPER_int.h"
 #include "HAL/MOTOR/MOTOR_int.h"
+#include "HAL/MPU6050/MPU_cfg.h"
+#include "HAL/MPU6050/MPU_int.h"
+#include "HAL/PCNT/PCNT_cfg.h"
+#include "HAL/PCNT/PCNT_int.h"
+#include "MCAL/I2C/I2C_cfg.h"
+#include <Arduino.h>
 static const I2C_Port_t SENSOR_I2C_PORT = I2C_PORT_0;
 static const uint8_t ULTRASONIC_TRIG_PIN = 26;
 static const uint8_t ULTRASONIC_ECHO_PIN = 27;
@@ -20,8 +19,8 @@ static void vInitSensors(void) {
   Serial.println("Ultrasonic sensor initialized (TRIG=GPIO26, ECHO=GPIO27)");
 
   bool bI2cReady =
-      I2C_xInitMaster(SENSOR_I2C_PORT, I2C_MASTER_SDA_PIN,
-                      I2C_MASTER_SCL_PIN, I2C_MASTER_FREQ_HZ) == I2C_OK;
+      I2C_xInitMaster(SENSOR_I2C_PORT, I2C_MASTER_SDA_PIN, I2C_MASTER_SCL_PIN,
+                      I2C_MASTER_FREQ_HZ) == I2C_OK;
   if (!bI2cReady) {
     Serial.println("ERROR: I2C initialization failed; MPU6050 unavailable");
   } else {
@@ -40,8 +39,7 @@ static void vInitSensors(void) {
     }
   }
 
-  PCNT_vInitEncoder(PCNT_UNIT_INDEX_0, ENCODER_LEFT_A_PIN,
-                    ENCODER_LEFT_B_PIN);
+  PCNT_vInitEncoder(PCNT_UNIT_INDEX_0, ENCODER_LEFT_A_PIN, ENCODER_LEFT_B_PIN);
   PCNT_vInitEncoder(PCNT_UNIT_INDEX_1, ENCODER_RIGHT_A_PIN,
                     ENCODER_RIGHT_B_PIN);
   Serial.println("Wheel encoders initialized; rotate wheels to test pulses");
@@ -71,5 +69,5 @@ void setup() {
 }
 
 void loop() {
-  vTaskDelete(NULL);  // all work happens in tasks
+  vTaskDelete(NULL); // all work happens in tasks
 }
