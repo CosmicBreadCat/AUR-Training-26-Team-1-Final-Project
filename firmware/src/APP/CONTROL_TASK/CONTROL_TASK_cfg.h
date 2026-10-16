@@ -23,9 +23,10 @@
 #define CONTROLTASK_BOOT_FACING Side::North
 
 /* Drivetrain geometry, for inverse kinematics. PLACEHOLDERS: measure. */
-#define CONTROLTASK_WHEEL_RADIUS_M 0.033f
-#define CONTROLTASK_TRACK_WIDTH_M 0.15f // distance between the wheel centers
-
+#define CONTROLTASK_WHEEL_RADIUS_M 0.026f
+#define CONTROLTASK_TRACK_WIDTH_M 0.27f
+#define CONTROLTASK_ENCODER_COUNTS_PER_WHEEL_REV 2024.0f
+#define CONTROLTASK_MAX_WHEEL_RAD_S 9.5f
 /* Front-corner IR line sensors (edge guard, SQUARE). Not read yet: an
  * unconnected pin floats and would trip the guard at random.
  * TODO set the real pins and the level that means "on the line", e.g.

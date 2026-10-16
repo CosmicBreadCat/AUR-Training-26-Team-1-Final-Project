@@ -6,7 +6,7 @@
 #include "MCAL/I2C/I2C_cfg.h"
 #include "APP/COMM_TASK/COMM_TASK_int.h"
 #include "APP/CONTROL_TASK/CONTROL_TASK_int.h"
-
+#include "HAL/MOTOR/MOTOR_int.h"
 static const I2C_Port_t SENSOR_I2C_PORT = I2C_PORT_0;
 static const uint8_t ULTRASONIC_TRIG_PIN = 26;
 static const uint8_t ULTRASONIC_ECHO_PIN = 27;
@@ -50,6 +50,8 @@ void setup() {
   delay(200);
 
   vInitSensors();
+
+  MOTOR_vInit();
 
   if (!COMMTASK_bStart()) {
     Serial.println("ERROR: comm task failed to start");

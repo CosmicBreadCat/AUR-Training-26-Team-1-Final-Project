@@ -22,7 +22,9 @@ typedef gpio_mode_t GPIO_Mode_t;
 typedef gpio_num_t GPIO_Pin_t;
 
 /* Function Prototypes */
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /**
  * @brief Initializes a specific GPIO pin mode and pull settings.
  * @param Copy_xPin GPIO pin number.
@@ -49,5 +51,7 @@ void GPIO_vTogglePin(GPIO_Pin_t PinNum);
  * @return uint8_t Returns 1 for GPIO_HIGH, 0 for GPIO_LOW.
  */
 uint8_t GPIO_u8GetPinValue(GPIO_Pin_t PinNum);
-
+#ifdef __cplusplus
+}
+#endif
 #endif /* GPIO_INT_H_ */

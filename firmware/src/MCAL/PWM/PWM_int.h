@@ -31,7 +31,9 @@ typedef enum {
 } PWM_ChannelNum_t;
 
 /* Function Prototypes */
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /**
  * @brief Configures a hardware timer for PWM generation.
  * @param Copy_xMode High Speed or Low Speed mode.
@@ -76,4 +78,8 @@ void PWM_vSetServoAngle(PWM_SpeedMode_t Copy_xMode,
                          PWM_ChannelNum_t Copy_xChannel, 
                          uint8_t Copy_u8Angle);
 
+
+#ifdef __cplusplus
+}
+#endif                         
 #endif /* PWM_INT_H_ */

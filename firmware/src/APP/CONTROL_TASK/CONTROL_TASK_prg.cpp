@@ -2,7 +2,10 @@
 #include "CONTROL_TASK_int.h"
 #include <Arduino.h>
 #include <math.h>
-
+#include "../../HAL/PCNT/PCNT_int.h"
+#include "../../HAL/PCNT/PCNT_cfg.h"
+#include "../../HAL/MOTOR/MOTOR_int.h"
+#include "../../HAL/MOTOR/MOTOR_cfg.h"
 /*
  * Runs every CONTROLTASK_PERIOD_MS on core 1. Owns every driver (motors,
  * encoders, IMU, IR, ultrasonic, servos) once they exist; talks to the comms
@@ -19,6 +22,23 @@ static Odometry xOdom = {};         // set to the boot pose in CONTROLTASK_bStar
 static Sensors xSensors = {NAN};    // no reading, IR not read (hasIr false)
 static bool bHaveHeadingRef = false; // a square_ref has set theta since boot
 static bool bSquareDone = false;     // the current SQUARE has used its square_ref
+
+
+static float fLeftWheelRadPerSec = 0.0f;
+static float fRightWheelRadPerSec = 0.0f;
+
+static int32_t s32LeftEncoderPosition = 0;
+static int32_t s32RightEncoderPosition = 0;
+
+static float fLeftIntegral = 0.0f;
+static float fRightIntegral = 0.0f;
+
+static constexpr float WHEEL_KP = 25.0f;
+static constexpr float WHEEL_KI = 80.0f;
+static constexpr float WHEEL_DT_S =
+    CONTROLTASK_PERIOD_MS / 1000.0f;
+
+
 
 /* Heading (rad) when facing an arena edge, in the arena frame (see _cfg.h) */
 static float fSideHeading(Side Copy_xSide) {
@@ -60,28 +80,73 @@ static void vApplySquareRef(Side Copy_xSide) {
 }
 
 /* Reads every sensor and updates the pose. All drivers are called from here. */
-static void vOdometryStep(void) {
-  // TODO encoders: read both PCNT units (PCNT_s16GetCount), accumulate the
-  //      16-bit deltas into 32-bit positions, estimate wheel velocities.
-  // TODO gyro: MPU6050_vReadData, subtract the calibrated bias, integrate the
-  //      z rate into heading (recalibrate the bias while stationary).
-  // TODO odometry: integrate x, y, theta from the wheel distances and the
-  //      gyro heading into xOdom (x, y, theta, v, omega).
-  // TODO ultrasonic: latest median-filtered range into xSensors.rangeM.
-  // TODO IR line sensors: read both inputs (GPIO_u8GetPinValue, pins and
-  //      active level in _cfg.h) into xSensors.irLeft / irRight and set
-  //      xSensors.hasIr = true. That also arms the edge guard. SQUARE will
-  //      additionally need the trip latches set by their interrupts.
+static void vOdometryStep(void)
+{
+  const float fDt = CONTROLTASK_PERIOD_MS / 1000.0f;
+
+  // Read encoder counts since the previous control cycle.
+  int16_t s16LeftDelta =
+      PCNT_s16GetCount(PCNT_UNIT_INDEX_0);
+
+  int16_t s16RightDelta =
+      PCNT_s16GetCount(PCNT_UNIT_INDEX_1);
+
+  // Clear hardware counters for the next cycle.
+  PCNT_vClearCount(PCNT_UNIT_INDEX_0);
+  PCNT_vClearCount(PCNT_UNIT_INDEX_1);
+
+  // Accumulate total encoder counts.
+  s32LeftEncoderPosition += s16LeftDelta;
+  s32RightEncoderPosition += s16RightDelta;
+
+  // Convert counts to wheel angular displacement (rad).
+  const float fCountsPerRev =
+      CONTROLTASK_ENCODER_COUNTS_PER_WHEEL_REV;
+
+  const float fLeftDeltaTheta =
+      (float)s16LeftDelta * (2.0f * (float)M_PI)
+      / fCountsPerRev;
+
+  const float fRightDeltaTheta =
+      (float)s16RightDelta * (2.0f * (float)M_PI)
+      / fCountsPerRev;
+
+  // Calculate measured wheel angular velocity (rad/s).
+  fLeftWheelRadPerSec = fLeftDeltaTheta / fDt;
+  fRightWheelRadPerSec = fRightDeltaTheta / fDt;
+
+  // Convert wheel displacement to linear distance.
+  const float fLeftDistance =
+      fLeftDeltaTheta * CONTROLTASK_WHEEL_RADIUS_M;
+
+  const float fRightDistance =
+      fRightDeltaTheta * CONTROLTASK_WHEEL_RADIUS_M;
+
+  // Update distance only. Do not estimate or change heading.
+  const float fCenterDistance =
+      (fLeftDistance + fRightDistance) / 2.0f;
+
+  xOdom.x += fCenterDistance * cosf(xOdom.theta);
+  xOdom.y += fCenterDistance * sinf(xOdom.theta);
+
+  // Estimated robot forward speed (m/s).
+  xOdom.v = fCenterDistance / fDt;
+
+  // Heading and angular velocity are intentionally not updated.
+  xOdom.omega = 0.0f;
 
   COMMTASK_vSetOdometry(&xOdom);
   COMMTASK_vSetSensors(&xSensors);
 }
-
 /* Runs once whenever a new command (mode or cmdSeq change) arrives */
-static void vEnterMode(const MotionCommand_t *Copy_pxCmd) {
-  (void)Copy_pxCmd;
-  // TODO reset the wheel-loop integrators, latch the current pose/heading as
-  //      the start point, init the slew limiters from the measured v, omega.
+static void vEnterMode(const MotionCommand_t *Copy_pxCmd)
+{
+    (void)Copy_pxCmd;
+
+    // Prevent accumulated error from a previous command
+    // from affecting the next command.
+    fLeftIntegral = 0.0f;
+    fRightIntegral = 0.0f;
 }
 
 /* Edge guard for one wheel: while its IR sees the boundary line it may stop
@@ -93,31 +158,89 @@ static float fGuardWheel(float Copy_fTarget, bool Copy_bOnLine) {
 /* Every mode's wheel speed targets (rad/s, + = forward) go through here, so
  * the edge guard can't be bypassed. SQUARE is exempt: it drives onto the
  * line on purpose. The guard only covers forward motion (no rear sensors). */
-static void vSetWheelTargets(float Copy_fWl, float Copy_fWr) {
-  if (xActive.mode != RobotMode::Square && xSensors.hasIr) {
-    Copy_fWl = fGuardWheel(Copy_fWl, xSensors.irLeft);
-    Copy_fWr = fGuardWheel(Copy_fWr, xSensors.irRight);
-  }
-  // TODO wheel loops: FF + PI per wheel towards Copy_fWl / Copy_fWr,
-  //      duty = V / V_batt, written to the motor driver.
-  (void)Copy_fWl;
-  (void)Copy_fWr;
+static void vSetWheelTargets(float Copy_fWl, float Copy_fWr)
+{
+    if (xActive.mode != RobotMode::Square && xSensors.hasIr) {
+        Copy_fWl = fGuardWheel(Copy_fWl, xSensors.irLeft);
+        Copy_fWr = fGuardWheel(Copy_fWr, xSensors.irRight);
+    }
+
+    // Left wheel
+    if (fabsf(Copy_fWl) < 0.01f) {
+        fLeftIntegral = 0.0f;
+        MOTOR_vSetLeft(0);
+    } else {
+        float fError = Copy_fWl - fLeftWheelRadPerSec;
+        float fCandidateIntegral =
+            fLeftIntegral + fError * WHEEL_DT_S;
+
+        float fOutput =
+            WHEEL_KP * fError + WHEEL_KI * fCandidateIntegral;
+
+        if (fOutput > MOTOR_PWM_MAX_DUTY) {
+            fOutput = MOTOR_PWM_MAX_DUTY;
+        } else if (fOutput < -MOTOR_PWM_MAX_DUTY) {
+            fOutput = -MOTOR_PWM_MAX_DUTY;
+        } else {
+            fLeftIntegral = fCandidateIntegral;
+        }
+
+        MOTOR_vSetLeft((int16_t)fOutput);
+    }
+
+    // Right wheel
+    if (fabsf(Copy_fWr) < 0.01f) {
+        fRightIntegral = 0.0f;
+        MOTOR_vSetRight(0);
+    } else {
+        float fError = Copy_fWr - fRightWheelRadPerSec;
+        float fCandidateIntegral =
+            fRightIntegral + fError * WHEEL_DT_S;
+
+        float fOutput =
+            WHEEL_KP * fError + WHEEL_KI * fCandidateIntegral;
+
+        if (fOutput > MOTOR_PWM_MAX_DUTY) {
+            fOutput = MOTOR_PWM_MAX_DUTY;
+        } else if (fOutput < -MOTOR_PWM_MAX_DUTY) {
+            fOutput = -MOTOR_PWM_MAX_DUTY;
+        } else {
+            fRightIntegral = fCandidateIntegral;
+        }
+
+        MOTOR_vSetRight((int16_t)fOutput);
+    }
 }
 
 static void vStepStop(void) {
   // TODO ramp to 0 through the slew limiter first, then coast (duty 0).
   vSetWheelTargets(0.0f, 0.0f);
 }
+static void vStepTwist(const MotionCommand_t *Copy_pxCmd)
+{
+    const float fR = CONTROLTASK_WHEEL_RADIUS_M;
+    const float fHalfB = CONTROLTASK_TRACK_WIDTH_M / 2.0f;
 
-static void vStepTwist(const MotionCommand_t *Copy_pxCmd) {
-  // TODO slew-limit v / omega first, and hold heading on the gyro while
-  //      omega == 0.
-  const float fR = CONTROLTASK_WHEEL_RADIUS_M;
-  const float fHalfB = CONTROLTASK_TRACK_WIDTH_M / 2.0f;
-  float fWl = (Copy_pxCmd->v - Copy_pxCmd->omega * fHalfB) / fR;
-  float fWr = (Copy_pxCmd->v + Copy_pxCmd->omega * fHalfB) / fR;
-  // TODO desaturate: scale both by min(1, w_max / max(|fWl|, |fWr|)).
-  vSetWheelTargets(fWl, fWr);
+    // Convert linear and angular velocity into wheel speeds.
+    float fWl =
+        (Copy_pxCmd->v - Copy_pxCmd->omega * fHalfB) / fR;
+
+    float fWr =
+        (Copy_pxCmd->v + Copy_pxCmd->omega * fHalfB) / fR;
+
+    // Scale both wheels together to preserve the requested turn.
+    float fMaxTarget = fmaxf(fabsf(fWl), fabsf(fWr));
+
+    if (fMaxTarget > CONTROLTASK_MAX_WHEEL_RAD_S)
+    {
+        float fScale = CONTROLTASK_MAX_WHEEL_RAD_S / fMaxTarget;
+
+        fWl *= fScale;
+        fWr *= fScale;
+    }
+
+    // Encoder feedback and PI control adjust the motor PWM.
+    vSetWheelTargets(fWl, fWr);
 }
 
 /* Reports progress of the current mode. DONE/FAILED end it: the comms task
@@ -250,6 +373,8 @@ static void vControlTask(void *pvParameters) {
   TickType_t xLastWake = xTaskGetTickCount();
   while (true) {
     vOdometryStep();
+
+
     vMotionStep();
     vGripperStep();
     vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(CONTROLTASK_PERIOD_MS));
